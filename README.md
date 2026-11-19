@@ -1,6 +1,6 @@
-# Shift-Coverage & Tip-Pool Optimizer (v1.0)
+# Shift-Coverage & Tip-Pool Optimizer (v2.0)
 
-A lightweight, zero-dependency browser web application for restaurant shift leads and hospitality managers. Combines deterministic shift-swap validation with 1.5x overtime financial liability alerts and FLSA-compliant weighted tip-pool allocation.
+A lightweight, zero-dependency browser web application for restaurant shift leads and hospitality managers. Combines deterministic shift-swap validation with 1.5x overtime financial liability alerts and FLSA-compliant bi-weekly tip-pool allocation.
 
 Built in strict compliance with the [`shift-tip-standards`](.agents/skills/shift-tip-standards/SKILL.md) design, technical, and calculation standards.
 
@@ -21,36 +21,39 @@ Built in strict compliance with the [`shift-tip-standards`](.agents/skills/shift
 ## ⚡ Core Features
 
 ### 1. Pre-loaded Synthetic Restaurant Roster (8 Staff Members)
-Realistic hospitality team covering all major station certifications and pay rates:
-- **Jordan Miller** — Server ($12.00/hr, 31.0 hrs logged)
-- **Maya Lin** — Server ($12.50/hr, **37.0 hrs logged**) — *Primed to trigger 3.0h overtime warning on 6.0h shift coverage*
-- **Elena Rodriguez** — Server ($11.50/hr, 22.0 hrs logged) — *Safe replacement candidate (stays <= 40h)*
-- **Samir Patel** — Bartender ($15.00/hr, 33.0 hrs logged)
-- **Chloe Bennett** — Bartender ($14.50/hr, 18.0 hrs logged) — *Station mismatch if attempting to cover Server or Line Cook*
-- **Leo Tanaka** — Busser ($13.00/hr, 26.0 hrs logged)
-- **Marcus Vance** — Line Cook ($19.00/hr, **36.5 hrs logged**) — *Kitchen overtime alert candidate*
-- **Rachel Greene** — Shift Lead ($22.00/hr, 35.0 hrs logged) — *Salaried lead, FLSA tip exempt*
+Realistic hospitality team with standardized **Team Member** and **Manager** roles:
+- **Jordan Miller** — Team Member ($13.00/hr, 31.0w / 62.0 bi-weekly hrs)
+- **Maya Lin** — Team Member ($13.50/hr, **37.0w / 74.0 bi-weekly hrs**) — *Primed to trigger 3.0h overtime warning on 6.0h shift coverage*
+- **Elena Rodriguez** — Team Member ($12.50/hr, 22.0w / 44.0 bi-weekly hrs) — *Safe replacement candidate (stays <= 40h)*
+- **Samir Patel** — Team Member ($15.00/hr, 33.0w / 66.0 bi-weekly hrs)
+- **Chloe Bennett** — Team Member ($12.00/hr, 18.0w / 36.0 bi-weekly hrs) — *Trainee status; triggers Role Mismatch on independent Team Member coverage*
+- **Leo Tanaka** — Team Member ($13.00/hr, 26.0w / 52.0 bi-weekly hrs)
+- **Marcus Vance** — Team Member ($18.00/hr, **36.5w / 73.0 bi-weekly hrs**) — *Overtime alert candidate*
+- **Rachel Greene** — Manager ($24.00/hr, 35.0w / 70.0 bi-weekly hrs) — *Salaried Manager, FLSA tip exempt*
 
 ### 2. Tab 1: Active Shift & Swap Validator
-- **Tonight's Floor Roster:** Displays 6 active floor shifts with live weekly hour tracking.
+- **Tonight's Floor Roster:** Displays 6 active floor shifts with live weekly hour tracking and bi-weekly hours logged.
 - **Coverage Evaluation Engine:** Click **"Request Cover / Swap"** on any active worker to evaluate all available replacement staff:
   - 🟢 **Safe to Approve:** Candidate possesses station certification and stays within 40.0 hours/week.
-  - ⚠️ **Overtime Alert:** Candidate possesses certification but shift exceeds 40.0 hours. Automatically calculates exact overtime hours and financial liability at 1.5x hourly rate (showing both regular wage, extra overtime premium, and total overtime pay).
+  - ⚠️ **Overtime Alert:** Candidate possesses certification but shift exceeds 40.0 hours. Automatically calculates exact overtime hours and financial liability at 1.5x hourly rate (showing regular wage, extra overtime premium, and total overtime pay).
   - ⛔ **Role Mismatch:** Candidate lacks the required station certification (e.g., Busser attempting to cover Bartender).
-- **One-Click Approval:** Updates tonight's scheduled floor roster and updates weekly hours logged.
+- **One-Click Approval:** Updates tonight's scheduled floor roster and updates weekly & bi-weekly hours logged.
 
-### 3. Tab 2: End-of-Night Tip-Pool Split
-- **Real-Time Sync:** Automatically pulls tonight's active floor staff and hours from Tab 1.
-- **Deterministic Tip Formula:**
-  $$\text{Employee Tip Payout} = \text{Total Tip Pool} \times \left( \frac{\text{Hours Worked} \times \text{Role Weight}}{\sum (\text{Staff Weighted Hours})} \right)$$
-- **Role Multipliers:** Bartender (1.2x), Server (1.0x), Busser (0.6x), Line Cook (0.0x), Shift Lead (0.0x FLSA locked).
-- **FLSA Labor Compliance Guardrail:** In accordance with federal FLSA regulations (29 U.S.C. § 203(m)(2)(B)), managers and shift leads are strictly barred from receiving employee tip pool distributions.
-- **Exact Penny Reconciliation:** Largest remainder rounding method ensures that the sum of individual team payouts equals the total collected tips to the exact cent ($0.00 remainder variance).
+### 3. Tab 2: Bi-Weekly Tip-Pool Optimizer
+- **Role Weight Multipliers Removed:** Tips are divided proportionally by bi-weekly hours worked.
+- **Deterministic Bi-Weekly Formula:**
+  $$\text{Employee Tip Payout} = \text{Total Tip Pool} \times \left( \frac{\text{Employee Bi-Weekly Hours}}{\sum \text{Eligible Staff Bi-Weekly Hours}} \right)$$
+- **Scope Toggle:** Switch between:
+  - **Tonight's Working Floor Crew** (active shifts from Tab 1)
+  - **All Store Employees (8 Staff)** (full store bi-weekly pool distribution)
+- **FLSA Labor Compliance Guardrail:** In accordance with federal FLSA regulations (29 U.S.C. § 203(m)(2)(B)), salaried managers are strictly barred from receiving employee tip pool distributions. Rachel Greene's allocation is locked to $0.00 (0.0%), ensuring 100% of tips are distributed among eligible Team Members.
+- **Exact Penny Reconciliation:** Largest Remainder Method ensures that the sum of individual team payouts equals the total collected tips to the exact cent ($0.00 remainder variance).
 - **Dual Payout Tracking:** Breaks out Cash Take-Home vs Credit Card Tips (for payroll).
+- **Inline Bi-Weekly Adjustments:** Adjust any employee's bi-weekly hours directly inside the table to re-balance the pool in real time.
 
 ### 4. Verified Shift Slip & Receipt (Print / Download)
 - Click **"Print Shift & Tip Slip"** for an authentic print-optimized register slip (`@media print` formatted).
-- Includes restaurant header, date, shift lead name, total tips collected, itemized crew payouts, and signature lines for management sign-off.
+- Includes restaurant header, date, shift lead name, scope, itemized crew payouts with bi-weekly hours, and signature lines for management sign-off.
 - Export as downloadable text record or copy summary to clipboard.
 
 ### 5. "Try It in 2 Minutes" Sample Scenario

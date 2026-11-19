@@ -13,11 +13,11 @@ description: Design, technical, and calculation standards for the Shift Coverage
 ## 2. Deterministic Math & Compliance Guardrails
 - Never use approximations or hard coded outputs. All overtime and tip-pool calculations must run live in JavaScript.
 - **Overtime Rule:** Flag any shift assignment or swap that pushes an employee above **40.0 hours/week** (Red Warning) and display the exact overtime cost impact at 1.5x hourly rate.
-- **Qualification Rule:** Block or flag swaps if the covering worker lacks the required station role/certification (e.g., Bartender, Line Cook, Shift Lead).
-- **Tip Pool Formula:** Calculate weighted tip shares transparently using:
-  `Employee Tip Payout = Total Tip Pool × ((Hours Worked × Role Weight) / Sum of All Staff Weighted Hours)`
-- Ensure the sum of individual payouts reconciles to the exact cent with the total tip pool (display rounding adjustments clearly if needed).
-- Exclude salaried managers from receiving tip-pool payouts in compliance with standard labor rules.
+- **Qualification Rule:** Block or flag swaps if the covering worker lacks the required role certification (standardized to **Team Member** and **Manager**).
+- **Tip Pool Formula (Bi-Weekly Hours Basis):** Divide collected tip receipts between eligible Team Members in direct proportion to bi-weekly hours worked (role weight multipliers removed):
+  `Employee Tip Payout = Total Tip Pool × (Employee Bi-Weekly Hours ÷ Sum of Eligible Staff Bi-Weekly Hours)`
+- Ensure the sum of individual payouts reconciles to the exact cent with the total tip pool (using Largest Remainder Method for $0.00 penny variance).
+- Exclude salaried Managers from receiving tip-pool payouts in strict compliance with federal FLSA Section 3(m)(2)(B) (29 U.S.C. § 203(m)(2)(B)).
 
 ## 3. UI & Accessibility Standards
 - Mobile-first responsive layout (must work cleanly on both a phone screen and a laptop browser without horizontal scrolling).

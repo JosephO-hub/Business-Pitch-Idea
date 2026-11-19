@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shift-Coverage & Tip-Pool Optimizer</title>
-  <meta name="description" content="Deterministic shift-swap validator and FLSA-compliant weighted tip-pool calculator for restaurant shift leads and hospitality managers.">
+  <title>Shift-Coverage &amp; Tip-Pool Optimizer</title>
+  <meta name="description" content="Deterministic shift-swap validator and FLSA-compliant bi-weekly tip-pool optimizer for restaurant shift leads and hospitality managers.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,9 +29,9 @@
         <div>
           <div class="brand-title-wrap">
             <h1 class="brand-title">Shift-Coverage &amp; Tip-Pool Optimizer</h1>
-            <span class="version-tag">v1.0 • Ready for GitHub Pages</span>
+            <span class="version-tag">v2.0 • Bi-Weekly Pool Standard</span>
           </div>
-          <p class="brand-subtitle">Deterministic swap validation with 1.5x overtime costing &amp; FLSA-compliant weighted tip allocation</p>
+          <p class="brand-subtitle">Deterministic swap validation with 1.5x overtime costing &amp; FLSA-compliant bi-weekly tip allocation</p>
         </div>
       </div>
 
@@ -59,16 +59,18 @@
       </div>
       <div class="status-divider">•</div>
       <div class="status-item">
-        <span>Working Floor Crew: <strong id="activeCrewCount">6 Staff</strong></span>
+        <span class="status-icon">👥</span>
+        <span>Working Floor Crew: <strong id="activeCrewCount">6 Active Staff</strong></span>
       </div>
       <div class="status-divider">•</div>
       <div class="status-item">
-        <span>Overtime Threshold: <strong>40.0 hrs/week</strong> (1.5x wage penalty)</span>
+        <span class="status-icon">⏱️</span>
+        <span>Overtime Threshold: <strong>40.0 hrs/week</strong> (1.5x wage liability)</span>
       </div>
       <div class="status-divider">•</div>
       <div class="status-item">
         <span class="flsa-pill" title="Managers and supervisors are strictly barred from employee tip pools under FLSA section 3(m)(2)(B)">
-          🛡️ FLSA Tip Compliance Guard Active
+          🛡️ FLSA 29 U.S.C. § 203(m)(2)(B) Active
         </span>
       </div>
     </div>
@@ -80,7 +82,7 @@
           <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
         </svg>
         <span>1. Active Shift &amp; Swap Validator</span>
-        <span class="tab-badge" id="swapPendingCount">Ready</span>
+        <span class="tab-badge" id="swapPendingCount">Deterministic</span>
       </button>
 
       <button class="tab-btn" data-tab="tabTipCalculator" id="tabBtn2">
@@ -88,8 +90,8 @@
           <line x1="12" y1="1" x2="12" y2="23"></line>
           <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
         </svg>
-        <span>2. End-of-Night Tip-Pool Split</span>
-        <span class="tab-badge sync-badge" id="tipPoolCrewSync">Synced</span>
+        <span>2. Bi-Weekly Tip-Pool Optimizer</span>
+        <span class="tab-badge sync-badge" id="tipPoolCrewSync">Exact Penny Sync</span>
       </button>
     </nav>
   </header>
@@ -102,11 +104,11 @@
       <div class="section-intro">
         <div>
           <h2 class="section-title">Tonight's Scheduled Floor Roster</h2>
-          <p class="section-desc">Select any scheduled shift below to initiate a coverage request or emergency swap. The system checks hourly limits, role certifications, and computes exact 1.5x overtime financial liability.</p>
+          <p class="section-desc">Select any scheduled shift below to initiate a coverage request or emergency swap. The system verifies station certifications, prevents illegal schedule conflicts, and calculates exact 1.5x overtime financial liability.</p>
         </div>
         <div class="legend-bar">
-          <span class="legend-tag safe"><span class="badge-dot green"></span> Safe to Approve</span>
-          <span class="legend-tag warning"><span class="badge-dot amber"></span> Overtime Alert</span>
+          <span class="legend-tag safe"><span class="badge-dot green"></span> Safe to Approve (≤40h)</span>
+          <span class="legend-tag warning"><span class="badge-dot amber"></span> Overtime Alert (&gt;40h)</span>
           <span class="legend-tag mismatch"><span class="badge-dot gray"></span> Role Mismatch</span>
         </div>
       </div>
@@ -121,7 +123,7 @@
         <div class="panel-header">
           <div class="panel-header-left">
             <span class="sub-badge">LIVE VALIDATION ENGINE</span>
-            <h3 class="panel-title" id="swapTargetTitle">Select a shift above to request coverage</h3>
+            <h3 class="panel-title" id="swapTargetTitle">Select any scheduled shift above to request coverage</h3>
             <p class="panel-subtitle" id="swapTargetSubtitle">Comparing all off-duty employees against station certifications and 40.0-hour overtime limits.</p>
           </div>
           <div class="panel-header-right" id="swapTargetActionContainer">
@@ -140,11 +142,14 @@
         <!-- Candidate Cards Container -->
         <div class="candidates-grid" id="swapCandidatesGrid">
           <div class="empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
+            <div class="empty-icon-wrap">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h4>No Shift Selected for Coverage</h4>
             <p>Click <strong>"Request Cover / Swap"</strong> on any scheduled employee above to evaluate eligible replacement staff.</p>
           </div>
         </div>
@@ -155,7 +160,7 @@
         <div class="roster-header">
           <div>
             <h3 class="section-title">Synthetic Restaurant Roster (8 Team Members)</h3>
-            <p class="section-desc">Baseline database with role certifications and current weekly hours. Notice Maya (37.0h) &amp; Marcus (36.5h) primed for overtime alert testing.</p>
+            <p class="section-desc">Baseline restaurant database with role certifications, current weekly hours, and bi-weekly hours. Maya (37.0h weekly / 74.0h bi-weekly) and Marcus (36.5h weekly / 73.0h bi-weekly) are primed for overtime alert testing.</p>
           </div>
         </div>
         <div class="table-card">
@@ -166,10 +171,11 @@
                   <th>Employee</th>
                   <th>Primary Role</th>
                   <th>Station Certifications</th>
-                  <th>Hourly Rate</th>
-                  <th>Weekly Hours Logged</th>
+                  <th class="num-col">Base Rate</th>
+                  <th class="num-col">Weekly Hours</th>
+                  <th class="num-col">Bi-Weekly Logged</th>
                   <th>Tonight's Status</th>
-                  <th>Action</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="rosterTableBody">
@@ -182,13 +188,13 @@
     </section>
 
     <!-- ============================================================== -->
-    <!-- TAB 2: END-OF-NIGHT TIP-POOL SPLIT                             -->
+    <!-- TAB 2: BI-WEEKLY TIP-POOL OPTIMIZER                            -->
     <!-- ============================================================== -->
     <section id="tabTipCalculator" class="tab-pane" aria-labelledby="tabBtn2">
       <div class="section-intro">
         <div>
-          <h2 class="section-title">Deterministic Tip-Pool Allocation Engine</h2>
-          <p class="section-desc">Pulls tonight's verified working floor crew directly from Tab 1. Enter cash and credit card tips to calculate proportional weighted payouts down to the exact cent.</p>
+          <h2 class="section-title">Deterministic Bi-Weekly Tip-Pool Allocation Engine</h2>
+          <p class="section-desc">Divides collected tip receipts between employees proportionally by their bi-weekly hours worked. Role weight multipliers have been eliminated in favor of clean, transparent hours-based equity with FLSA management exclusions.</p>
         </div>
         <div class="section-intro-actions">
           <button id="btnPrintReceiptBtn" class="btn btn-primary">
@@ -213,7 +219,11 @@
       <div class="tip-inputs-row">
         <!-- Input Card -->
         <div class="tip-box input-box">
-          <h3 class="box-title">1. Enter Shift Tip Receipts</h3>
+          <div class="box-title-row">
+            <h3 class="box-title">1. Enter Shift Tip Receipts</h3>
+            <span class="box-badge">Cash &amp; Payroll CC</span>
+          </div>
+
           <div class="input-group-grid">
             <div class="form-group">
               <label for="inputCashTips">
@@ -224,7 +234,7 @@
                 <span class="currency-sym">$</span>
                 <input type="number" id="inputCashTips" class="form-input" min="0" step="1" value="240.00" placeholder="0.00">
               </div>
-              <span class="help-text">Distributed tonight as cash take-home</span>
+              <span class="help-text">Distributed tonight as instant cash take-home</span>
             </div>
 
             <div class="form-group">
@@ -236,7 +246,18 @@
                 <span class="currency-sym">$</span>
                 <input type="number" id="inputCcTips" class="form-input" min="0" step="1" value="860.00" placeholder="0.00">
               </div>
-              <span class="help-text">Paid out on next bi-weekly payroll</span>
+              <span class="help-text">Disbursed on next bi-weekly payroll cycle</span>
+            </div>
+          </div>
+
+          <!-- Quick Tip Preset Buttons -->
+          <div class="tip-presets-wrap">
+            <span class="presets-label">Quick Tip Presets:</span>
+            <div class="presets-buttons">
+              <button class="btn-tip-preset" data-cash="120" data-cc="480">$600 (Lunch)</button>
+              <button class="btn-tip-preset" data-cash="240" data-cc="860">$1,100 (Dinner)</button>
+              <button class="btn-tip-preset" data-cash="350" data-cc="1250">$1,600 (Peak Sat)</button>
+              <button class="btn-tip-preset" data-cash="500" data-cc="1800">$2,300 (Banquet)</button>
             </div>
           </div>
 
@@ -249,33 +270,56 @@
             <div class="pool-metrics">
               <div class="mini-metric">
                 <span class="label">Cash:</span>
-                <span class="val" id="miniCash">$240.00</span>
+                <span class="val text-cash font-mono" id="miniCash">$240.00</span>
               </div>
               <div class="mini-metric">
                 <span class="label">CC:</span>
-                <span class="val" id="miniCc">$860.00</span>
+                <span class="val text-cc font-mono" id="miniCc">$860.00</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Role Weights Configuration -->
-        <div class="tip-box weights-box">
+        <!-- Bi-Weekly Tip Distribution Parameters Card -->
+        <div class="tip-box parameters-box">
           <div class="box-title-row">
-            <h3 class="box-title">2. Role Weight Multipliers</h3>
-            <button id="btnResetWeights" class="btn-text-action" title="Reset weights to restaurant standards">Reset Weights</button>
+            <h3 class="box-title">2. Bi-Weekly Allocation Basis</h3>
+            <span class="scope-count-badge" id="scopeCountDisplay">6 Staff (5 Eligible)</span>
           </div>
-          <p class="box-desc">Standard restaurant distribution weights. Adjust sliders to adjust distribution rates transparently.</p>
-          
-          <div class="weights-sliders-list" id="roleWeightsList">
-            <!-- Dynamic Role Weight Sliders -->
+          <p class="box-desc">Tips are allocated strictly in direct proportion to bi-weekly hours worked. Select distribution scope below:</p>
+
+          <!-- Scope Switcher Pill Control -->
+          <div class="scope-toggle-group">
+            <button class="scope-toggle-btn active" data-scope="crew">
+              <span class="scope-icon">🍽️</span>
+              <span class="scope-title">Tonight's Working Floor Crew</span>
+              <span class="scope-meta">Active shifts from Tab 1</span>
+            </button>
+            <button class="scope-toggle-btn" data-scope="all">
+              <span class="scope-icon">🏪</span>
+              <span class="scope-title">All Store Employees (8 Staff)</span>
+              <span class="scope-meta">Full roster pay period distribution</span>
+            </button>
           </div>
 
+          <!-- Bi-Weekly KPI Metric Cards -->
+          <div class="kpi-mini-grid">
+            <div class="kpi-mini-card">
+              <span class="kpi-label">Eligible Bi-Weekly Hours</span>
+              <span class="kpi-val font-mono" id="kpiEligibleHours">297.0 hrs</span>
+            </div>
+            <div class="kpi-mini-card">
+              <span class="kpi-label">Average Tip Rate Boost</span>
+              <span class="kpi-val font-mono text-safe" id="kpiAvgRate">+$3.70/hr</span>
+            </div>
+          </div>
+
+          <!-- FLSA Section 3(m)(2)(B) Compliance Guardrail -->
           <div class="flsa-compliance-callout">
             <div class="callout-icon">⚖️</div>
             <div class="callout-body">
-              <strong>FLSA Labor Standard Guardrail:</strong>
-              <p>Under federal FLSA rules, Shift Leads &amp; Managers cannot participate in employee tip pools. Shift Lead weight is locked to 0.0x.</p>
+              <strong>FLSA Federal Labor Standard Guardrail (29 U.S.C. § 203(m)(2)(B)):</strong>
+              <p>Salaried managers cannot participate in employee tip pools. Rachel Greene's (Manager) share is strictly <strong>$0.00 (0.0%)</strong>, while eligible Team Members receive 100% of collected tips.</p>
             </div>
           </div>
         </div>
@@ -285,9 +329,9 @@
       <div class="formula-strip">
         <div class="formula-tag">MATHEMATICAL FORMULA:</div>
         <code class="formula-code">
-          Employee Tip = Total Pool × [ (Hours Worked × Role Weight) ÷ Sum of All Weighted Hours ]
+          Employee Tip Payout = Total Tip Pool × [ Employee Bi-Weekly Hours ÷ Sum of Eligible Staff Bi-Weekly Hours ]
         </code>
-        <div class="reconciliation-badge" id="reconciliationStatus">
+        <div class="reconciliation-badge balanced" id="reconciliationStatus">
           <span class="badge-dot green"></span>
           Exact Cent Balanced: $0.00 Penny Remainder
         </div>
@@ -297,11 +341,11 @@
       <div class="table-card">
         <div class="table-header-bar">
           <div>
-            <h3 class="card-heading">Tonight's Working Crew Payout Breakdown</h3>
-            <span class="card-subheading">Hours pulled live from Tab 1. You may adjust hours worked tonight if an employee clocked in/out early.</span>
+            <h3 class="card-heading">Bi-Weekly Tip Distribution Breakdown</h3>
+            <span class="card-subheading">Tips are divided proportionally by bi-weekly hours. You can edit any employee's bi-weekly hours directly below to re-balance the pool live.</span>
           </div>
           <div class="sync-indicator">
-            <span class="sync-dot"></span> Real-Time Sync with Tab 1
+            <span class="sync-dot"></span> Real-Time Synchronized
           </div>
         </div>
 
@@ -311,12 +355,11 @@
               <tr>
                 <th>Team Member</th>
                 <th>Shift Role</th>
-                <th class="num-col">Shift Hours</th>
-                <th class="num-col">Weight</th>
-                <th class="num-col">Weighted Pts</th>
+                <th class="num-col">Tonight's Shift</th>
+                <th class="num-col highlight-col">Bi-Weekly Hours Logged</th>
                 <th class="num-col">Pool Share %</th>
-                <th class="num-col">Cash Share</th>
-                <th class="num-col">CC Share (Payroll)</th>
+                <th class="num-col text-cash">Cash Take-Home</th>
+                <th class="num-col text-cc">CC Share (Payroll)</th>
                 <th class="num-col highlight-header">Total Tip Payout</th>
               </tr>
             </thead>
@@ -347,12 +390,13 @@
         <div class="receipt-slip" id="printableReceipt">
           <div class="slip-header">
             <div class="slip-logo">✦ THE COPPER OAK BISTRO ✦</div>
-            <div class="slip-sub">SHIFT CLOSEOUT &amp; TIP POOL SETTLEMENT</div>
+            <div class="slip-sub">SHIFT CLOSEOUT &amp; BI-WEEKLY TIP POOL SETTLEMENT</div>
             <div class="slip-meta">
               <div><strong>Shift:</strong> <span id="slipShiftName">Friday Dinner Rush</span></div>
               <div><strong>Date:</strong> <span id="slipDate">Nov 18, 2026</span></div>
               <div><strong>Generated:</strong> <span id="slipTimestamp">11:15 PM</span></div>
-              <div><strong>Shift Lead:</strong> <span id="slipLeadName">Rachel Greene</span></div>
+              <div><strong>Shift Manager:</strong> <span id="slipLeadName">Rachel Greene (Manager • FLSA Exempt)</span></div>
+              <div><strong>Scope:</strong> <span id="slipScope">Tonight's Working Crew</span></div>
             </div>
           </div>
 
@@ -361,29 +405,29 @@
           <div class="slip-totals">
             <div class="slip-row">
               <span>Total Cash Tips:</span>
-              <span id="slipCashTips">$240.00</span>
+              <span class="font-mono" id="slipCashTips">$240.00</span>
             </div>
             <div class="slip-row">
               <span>Total Credit Card Tips:</span>
-              <span id="slipCcTips">$860.00</span>
+              <span class="font-mono" id="slipCcTips">$860.00</span>
             </div>
             <div class="slip-row bold total-line">
               <span>TOTAL TIP POOL:</span>
-              <span id="slipTotalPool">$1,100.00</span>
+              <span class="font-mono" id="slipTotalPool">$1,100.00</span>
             </div>
             <div class="slip-row muted">
-              <span>Total Working Hours:</span>
-              <span id="slipTotalHours">38.0 hrs</span>
+              <span>Tonight's Shift Hours:</span>
+              <span class="font-mono" id="slipTotalHours">38.0 hrs</span>
             </div>
             <div class="slip-row muted">
-              <span>Total Weighted Points:</span>
-              <span id="slipTotalWeighted">33.0 pts</span>
+              <span>Total Eligible Bi-Weekly Hours:</span>
+              <span class="font-mono" id="slipTotalBiweekly">297.0 hrs</span>
             </div>
           </div>
 
           <div class="slip-divider">------------------------------------------------</div>
 
-          <div class="slip-crew-title">CREW ITEMIZATION &amp; PAYOUTS</div>
+          <div class="slip-crew-title">CREW BI-WEEKLY ALLOCATIONS &amp; PAYOUTS</div>
           <div class="slip-crew-list" id="slipCrewList">
             <!-- Populated via JS -->
           </div>
@@ -397,24 +441,24 @@
             </div>
             <div class="slip-row">
               <span>FLSA Audit Check:</span>
-              <span>PASSED (Managers Excluded)</span>
+              <span>PASSED (Managers Excluded under § 203(m)(2)(B))</span>
             </div>
           </div>
 
           <div class="slip-signatures">
             <div class="sig-block">
               <div class="sig-line"></div>
-              <span>Shift Lead Signature</span>
+              <span>Shift Manager Signature</span>
             </div>
             <div class="sig-block">
               <div class="sig-line"></div>
-              <span>GM / Manager Sign-off</span>
+              <span>General Manager Sign-Off</span>
             </div>
           </div>
 
           <div class="slip-footer">
-            Printed from Shift-Coverage &amp; Tip-Pool Optimizer v1.0<br>
-            Tamper-proof deterministic calculation record.
+            Printed from Shift-Coverage &amp; Tip-Pool Optimizer v2.0<br>
+            Tamper-proof deterministic bi-weekly calculation record.
           </div>
         </div>
       </div>

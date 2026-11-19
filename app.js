@@ -1,92 +1,103 @@
 /**
- * Shift-Coverage & Tip-Pool Optimizer (v1.0)
+ * Shift-Coverage & Tip-Pool Optimizer (v2.1)
  * Standards compliant with /shift-tip-standards:
- * - Pure vanilla ES6 JavaScript (No build steps, no backend)
+ * - Pure vanilla ES6 JavaScript (No build steps, no backend, GitHub Pages ready)
  * - Deterministic math with exact penny reconciliation
  * - 1.5x Overtime financial liability calculation
  * - FLSA 29 U.S.C. § 203(m)(2)(B) manager tip-exclusion guardrail
- * - LocalStorage state persistence with instant reset
+ * - Shift Roles standardized to "Team Member" and "Manager"
+ * - Bi-weekly hours proportional tip distribution (Role weights removed)
+ * - LocalStorage state persistence with instant sample data reset
  */
 
 (function () {
   'use strict';
 
   // =========================================================================
-  // Baseline Synthetic Data
+  // Baseline Synthetic Restaurant Roster & Shifts (8 Staff Members)
+  // Shift Roles: "Team Member" & "Manager"
   // =========================================================================
 
   const INITIAL_ROSTER = [
     {
       id: 'emp-1',
       name: 'Jordan Miller',
-      role: 'Server',
-      hourlyRate: 12.00,
+      role: 'Team Member',
+      hourlyRate: 13.00,
       weeklyHours: 31.0,
-      certifications: ['Server'],
+      biweeklyHours: 62.0, // Bi-weekly hours logged
+      certifications: ['Team Member'],
       isManager: false
     },
     {
       id: 'emp-2',
       name: 'Maya Lin',
-      role: 'Server',
-      hourlyRate: 12.50,
-      weeklyHours: 37.0, // High hours -> triggers 3.0h Overtime Warning on 6h shift
-      certifications: ['Server', 'Bartender'],
+      role: 'Team Member',
+      hourlyRate: 13.50,
+      weeklyHours: 37.0, // Primed to trigger 3.0h Overtime Warning on 6.0h shift
+      biweeklyHours: 74.0,
+      certifications: ['Team Member'],
       isManager: false
     },
     {
       id: 'emp-3',
       name: 'Elena Rodriguez',
-      role: 'Server',
-      hourlyRate: 11.50,
+      role: 'Team Member',
+      hourlyRate: 12.50,
       weeklyHours: 22.0, // Safe candidate (22 + 6 = 28 <= 40)
-      certifications: ['Server', 'Busser'],
+      biweeklyHours: 44.0,
+      certifications: ['Team Member'],
       isManager: false
     },
     {
       id: 'emp-4',
       name: 'Samir Patel',
-      role: 'Bartender',
+      role: 'Team Member',
       hourlyRate: 15.00,
       weeklyHours: 33.0,
-      certifications: ['Bartender', 'Server'],
+      biweeklyHours: 66.0,
+      certifications: ['Team Member'],
       isManager: false
     },
     {
       id: 'emp-5',
       name: 'Chloe Bennett',
-      role: 'Bartender',
-      hourlyRate: 14.50,
+      role: 'Team Member',
+      hourlyRate: 12.00,
       weeklyHours: 18.0,
-      certifications: ['Bartender'], // Role mismatch if covering Server or Line Cook
+      biweeklyHours: 36.0,
+      certifications: ['Trainee'], // Lacks independent 'Team Member' certification -> triggers Role Mismatch
       isManager: false
     },
     {
       id: 'emp-6',
       name: 'Leo Tanaka',
-      role: 'Busser',
+      role: 'Team Member',
       hourlyRate: 13.00,
       weeklyHours: 26.0,
-      certifications: ['Busser'],
+      biweeklyHours: 52.0,
+      certifications: ['Team Member'],
       isManager: false
     },
     {
       id: 'emp-7',
       name: 'Marcus Vance',
-      role: 'Line Cook',
-      hourlyRate: 19.00,
-      weeklyHours: 36.5, // High hours -> triggers Overtime Warning on Kitchen shift
-      certifications: ['Line Cook'],
+      role: 'Team Member',
+      hourlyRate: 18.00,
+      weeklyHours: 36.5, // Primed for Overtime alert testing (36.5 + 6 = 42.5h)
+      biweeklyHours: 73.0,
+      certifications: ['Team Member'],
       isManager: false
     },
     {
       id: 'emp-8',
       name: 'Rachel Greene',
-      role: 'Shift Lead',
-      hourlyRate: 22.00,
+      role: 'Manager',
+      hourlyRate: 24.00,
       weeklyHours: 35.0,
-      certifications: ['Shift Lead', 'Server', 'Bartender'],
-      isManager: true // FLSA Tip Exclusion Rule applies
+      biweeklyHours: 70.0,
+      certifications: ['Manager', 'Team Member'],
+      isManager: true // FLSA Tip Exclusion Rule applies strictly
     }
   ];
 
@@ -94,68 +105,60 @@
     {
       id: 'shift-1',
       employeeId: 'emp-1', // Jordan Miller
-      role: 'Server',
+      role: 'Team Member',
       startTime: '5:00 PM',
       endTime: '11:00 PM',
       hours: 6.0,
-      notes: 'Main Dining Room'
+      notes: 'Dining Room & Guest Service'
     },
     {
       id: 'shift-2',
       employeeId: 'emp-3', // Elena Rodriguez
-      role: 'Server',
+      role: 'Team Member',
       startTime: '4:30 PM',
       endTime: '10:30 PM',
       hours: 6.0,
-      notes: 'Patio & Lounge'
+      notes: 'Patio & Beverage Service'
     },
     {
       id: 'shift-3',
       employeeId: 'emp-4', // Samir Patel
-      role: 'Bartender',
+      role: 'Team Member',
       startTime: '4:00 PM',
       endTime: '12:00 AM',
       hours: 8.0,
-      notes: 'Main Craft Bar'
+      notes: 'Bar & Hospitality Station'
     },
     {
       id: 'shift-4',
       employeeId: 'emp-6', // Leo Tanaka
-      role: 'Busser',
+      role: 'Team Member',
       startTime: '5:00 PM',
       endTime: '10:00 PM',
       hours: 5.0,
-      notes: 'Floor Turnover & Water'
+      notes: 'Floor Support & Turnover'
     },
     {
       id: 'shift-5',
       employeeId: 'emp-7', // Marcus Vance
-      role: 'Line Cook',
+      role: 'Team Member',
       startTime: '3:30 PM',
       endTime: '10:30 PM',
       hours: 7.0,
-      notes: 'Sautee & Grill Station'
+      notes: 'Kitchen & Expediting Station'
     },
     {
       id: 'shift-6',
-      employeeId: 'emp-8', // Rachel Greene
-      role: 'Shift Lead',
+      employeeId: 'emp-8', // Rachel Greene (Manager)
+      role: 'Manager',
       startTime: '4:00 PM',
       endTime: '12:00 AM',
       hours: 8.0,
-      notes: 'Floor Supervision & Cashier'
+      notes: 'Floor Operations & Cash Closeout'
     }
   ];
 
-  const DEFAULT_WEIGHTS = {
-    'Bartender': 1.2,
-    'Server': 1.0,
-    'Busser': 0.6,
-    'Line Cook': 0.0,
-    'Shift Lead': 0.0 // Strictly 0.0 for FLSA compliance
-  };
-
-  const STORAGE_KEY = 'shift_tip_optimizer_state_v1';
+  const STORAGE_KEY = 'shift_tip_optimizer_state_v3';
 
   // =========================================================================
   // State Container
@@ -170,8 +173,8 @@
       cash: 240.00,
       cc: 860.00
     },
-    roleWeights: JSON.parse(JSON.stringify(DEFAULT_WEIGHTS)),
-    shiftHoursOverride: {} // Map shiftId -> hours worked tonight
+    tipScope: 'crew', // 'crew' (tonight's floor crew) or 'all' (all store employees)
+    shiftHoursOverride: {}
   };
 
   // =========================================================================
@@ -185,10 +188,12 @@
         const parsed = JSON.parse(saved);
         if (parsed.roster && parsed.shifts) {
           state = parsed;
-          // Ensure weights have all defaults
-          state.roleWeights = Object.assign({}, DEFAULT_WEIGHTS, state.roleWeights);
-          // Strictly enforce Shift Lead 0 weight for FLSA
-          state.roleWeights['Shift Lead'] = 0.0;
+          state.roster.forEach(emp => {
+            if (emp.biweeklyHours === undefined) {
+              emp.biweeklyHours = parseFloat((emp.weeklyHours * 2).toFixed(1));
+            }
+          });
+          if (!state.tipScope) state.tipScope = 'crew';
         }
       }
     } catch (e) {
@@ -214,12 +219,12 @@
         cash: 240.00,
         cc: 860.00
       },
-      roleWeights: JSON.parse(JSON.stringify(DEFAULT_WEIGHTS)),
+      tipScope: 'crew',
       shiftHoursOverride: {}
     };
     saveState();
     renderAll();
-    showToast('Reset to default 8-person restaurant roster & schedule.', 'info');
+    showToast('Reset to default 8-person roster with Team Member & Manager roles.', 'info');
   }
 
   // =========================================================================
@@ -258,7 +263,7 @@
    * Along with exact OT hours and 1.5x financial liability.
    */
   function evaluateCoverageCandidate(candidate, targetShift) {
-    // 1. Check Station Role Certification
+    // 1. Check Station Role Certification (Team Member vs Manager)
     const isCertified = candidate.certifications && candidate.certifications.includes(targetShift.role);
     if (!isCertified) {
       return {
@@ -269,6 +274,7 @@
         canApprove: false,
         otHours: 0,
         extraCost: 0,
+        totalOtPay: 0,
         projectedHours: candidate.weeklyHours + targetShift.hours
       };
     }
@@ -283,36 +289,30 @@
         status: 'safe',
         badgeText: 'Safe to Approve',
         badgeClass: 'safe',
-        reason: `Stays at ${projectedHours.toFixed(1)} hrs (<= 40.0h). Standard wage apply.`,
+        reason: `Stays at ${projectedHours.toFixed(1)} hrs (≤ 40.0h). Standard wage applies without overtime penalty.`,
         canApprove: true,
         otHours: 0,
         extraCost: 0,
+        totalOtPay: 0,
         projectedHours: projectedHours
       };
     }
 
     // 3. Overtime Alert Calculation
-    // Overtime hours triggered by this shift:
-    // If candidate was already at or above 40, entire shift is OT.
-    // If candidate was below 40, portion above 40 is OT.
     const otHours = currentHours >= 40.0 
       ? shiftHours 
       : (projectedHours - 40.0);
     
-    // Regular wage rate
     const regularRate = candidate.hourlyRate;
-    // Overtime rate is 1.5x
     const otRate = regularRate * 1.5;
-    // Extra cost beyond regular pay = otHours * (0.5 * regularRate)
-    const extraOvertimeCost = otHours * (regularRate * 0.5);
-    // Total pay for those OT hours = otHours * otRate
-    const totalOtPay = otHours * otRate;
+    const extraOvertimeCost = otHours * (regularRate * 0.5); // Premium cost impact
+    const totalOtPay = otHours * otRate; // Full overtime wage
 
     return {
       status: 'warning',
       badgeText: `Overtime Alert (+${otHours.toFixed(1)}h OT)`,
       badgeClass: 'warning',
-      reason: `Pushes weekly total to ${projectedHours.toFixed(1)} hrs (> 40.0h). Requires 1.5x overtime wage.`,
+      reason: `Pushes weekly total to ${projectedHours.toFixed(1)} hrs (> 40.0h). Requires 1.5x overtime wage penalty.`,
       canApprove: true,
       otHours: otHours,
       extraCost: extraOvertimeCost,
@@ -328,10 +328,15 @@
 
     if (!shift || !candidate || !previousEmployee) return;
 
-    // Adjust weekly logged hours in deterministic compliance
     const shiftHours = shift.hours;
+
+    // Adjust weekly logged hours in deterministic compliance
     previousEmployee.weeklyHours = Math.max(0, parseFloat((previousEmployee.weeklyHours - shiftHours).toFixed(1)));
     candidate.weeklyHours = parseFloat((candidate.weeklyHours + shiftHours).toFixed(1));
+
+    // Adjust bi-weekly logged hours consistently
+    previousEmployee.biweeklyHours = Math.max(0, parseFloat((previousEmployee.biweeklyHours - shiftHours).toFixed(1)));
+    candidate.biweeklyHours = parseFloat((candidate.biweeklyHours + shiftHours).toFixed(1));
 
     // Assign shift to candidate
     shift.employeeId = candidate.id;
@@ -339,61 +344,83 @@
     saveState();
     renderAll();
 
-    showToast(`Swap Approved! ${candidate.name} is now assigned to tonight's ${shift.role} shift.`, 'success');
+    showToast(`Swap Approved! ${candidate.name} is now assigned to tonight's ${shift.role} shift. Weekly & bi-weekly hours updated.`, 'success');
   }
 
   // =========================================================================
-  // Tip Pool Engine (Deterministic Weighted Math & Penny Reconciliation)
+  // Tip Pool Engine (Bi-Weekly Hours Proportional Division & Exact Penny Reconciliation)
   // =========================================================================
 
+  /**
+   * Divides the Tip Pool Total between eligible Team Members by their bi-weekly hours.
+   * Shift Roles: "Team Member" (eligible) and "Manager" (strictly excluded).
+   * Managers are excluded per FLSA § 203(m)(2)(B).
+   * Uses Largest Remainder Method for 100% exact cent balancing with zero penny variance.
+   */
   function calculateTipPool() {
     const cashTips = parseFloat(state.tips.cash) || 0;
     const ccTips = parseFloat(state.tips.cc) || 0;
     const totalTips = cashTips + ccTips;
 
-    // Compile active working crew from tonight's shifts
-    // A person might only work 1 shift, but if multiple, aggregate their hours
-    const crewMap = new Map();
+    let candidatesList = [];
 
-    state.shifts.forEach(shift => {
-      const emp = getEmployeeById(shift.employeeId);
-      if (!emp) return;
-
-      const hoursWorked = getShiftActualHours(shift);
-      const role = shift.role;
-      // Shift lead / managers are strictly 0 weight per FLSA
-      let weight = state.roleWeights[role] !== undefined ? state.roleWeights[role] : 1.0;
-      if (emp.isManager || role === 'Shift Lead') {
-        weight = 0.0;
-      }
-
-      if (!crewMap.has(emp.id)) {
-        crewMap.set(emp.id, {
+    if (state.tipScope === 'all') {
+      candidatesList = state.roster.map(emp => {
+        const activeShift = state.shifts.find(s => s.employeeId === emp.id);
+        return {
           employee: emp,
-          role: role,
-          hoursWorked: hoursWorked,
-          weight: weight,
-          shiftId: shift.id
-        });
-      } else {
-        const existing = crewMap.get(emp.id);
-        existing.hoursWorked += hoursWorked;
+          role: activeShift ? activeShift.role : emp.role,
+          shiftHours: activeShift ? getShiftActualHours(activeShift) : 0,
+          biweeklyHours: emp.biweeklyHours !== undefined ? emp.biweeklyHours : (emp.weeklyHours * 2),
+          isWorkingTonight: !!activeShift,
+          shiftId: activeShift ? activeShift.id : null
+        };
+      });
+    } else {
+      const crewMap = new Map();
+
+      state.shifts.forEach(shift => {
+        const emp = getEmployeeById(shift.employeeId);
+        if (!emp) return;
+
+        const hoursWorked = getShiftActualHours(shift);
+
+        if (!crewMap.has(emp.id)) {
+          crewMap.set(emp.id, {
+            employee: emp,
+            role: shift.role,
+            shiftHours: hoursWorked,
+            biweeklyHours: emp.biweeklyHours !== undefined ? emp.biweeklyHours : (emp.weeklyHours * 2),
+            isWorkingTonight: true,
+            shiftId: shift.id
+          });
+        } else {
+          const existing = crewMap.get(emp.id);
+          existing.shiftHours += hoursWorked;
+        }
+      });
+
+      candidatesList = Array.from(crewMap.values());
+    }
+
+    // Determine eligible employees:
+    // Only non-managers with role "Team Member" participate in the tip pool.
+    // Managers are excluded under FLSA § 203(m)(2)(B).
+    let totalEligibleBiweeklyHours = 0;
+    let totalAllBiweeklyHours = 0;
+    let totalShiftHours = 0;
+
+    candidatesList.forEach(item => {
+      totalAllBiweeklyHours += item.biweeklyHours;
+      totalShiftHours += item.shiftHours;
+
+      item.isEligible = (!item.employee.isManager && item.employee.role !== 'Manager' && item.role !== 'Manager' && item.biweeklyHours > 0);
+
+      if (item.isEligible) {
+        totalEligibleBiweeklyHours += item.biweeklyHours;
       }
     });
 
-    const crew = Array.from(crewMap.values());
-
-    // Calculate weighted hours per employee
-    let totalWeightedHours = 0;
-    let totalWorkingHours = 0;
-
-    crew.forEach(item => {
-      item.weightedHours = item.hoursWorked * item.weight;
-      totalWeightedHours += item.weightedHours;
-      totalWorkingHours += item.hoursWorked;
-    });
-
-    // Exact cent calculations
     const totalCents = Math.round(totalTips * 100);
     const cashCents = Math.round(cashTips * 100);
     const ccCents = Math.round(ccTips * 100);
@@ -403,18 +430,16 @@
     let allocatedCcCents = 0;
 
     // First pass: Proportional floor distribution
-    crew.forEach(item => {
-      if (totalWeightedHours > 0 && item.weightedHours > 0) {
-        item.poolSharePercent = (item.weightedHours / totalWeightedHours) * 100;
+    candidatesList.forEach(item => {
+      if (item.isEligible && totalEligibleBiweeklyHours > 0) {
+        item.poolSharePercent = (item.biweeklyHours / totalEligibleBiweeklyHours) * 100;
         
-        // Exact cent proportion
-        const exactStaffTotalCents = (totalCents * item.weightedHours) / totalWeightedHours;
-        const exactStaffCashCents = totalTips > 0 ? (cashCents * item.weightedHours) / totalWeightedHours : 0;
+        const exactStaffTotalCents = (totalCents * item.biweeklyHours) / totalEligibleBiweeklyHours;
+        const exactStaffCashCents = totalTips > 0 ? (cashCents * item.biweeklyHours) / totalEligibleBiweeklyHours : 0;
         
         item.totalCents = Math.floor(exactStaffTotalCents);
         item.cashCents = Math.floor(exactStaffCashCents);
         item.ccCents = item.totalCents - item.cashCents;
-        
         item.remainder = exactStaffTotalCents - item.totalCents;
       } else {
         item.poolSharePercent = 0.0;
@@ -431,14 +456,12 @@
 
     // Second pass: Largest Remainder Method (Penny Reconciliation)
     let pennyDiff = totalCents - allocatedTotalCents;
-    if (pennyDiff > 0 && totalWeightedHours > 0) {
-      // Sort crew by largest decimal remainder among tipped staff
-      const eligible = crew.filter(c => c.weight > 0);
+    if (pennyDiff > 0 && totalEligibleBiweeklyHours > 0) {
+      const eligible = candidatesList.filter(c => c.isEligible);
       eligible.sort((a, b) => b.remainder - a.remainder);
 
       for (let i = 0; i < pennyDiff && i < eligible.length; i++) {
         eligible[i].totalCents += 1;
-        // Distribute remainder cent into cash if cash has remainder, else CC
         if (cashCents > allocatedCashCents) {
           eligible[i].cashCents += 1;
           allocatedCashCents += 1;
@@ -450,20 +473,24 @@
       }
     }
 
-    // Convert back to dollar decimals
-    crew.forEach(item => {
+    candidatesList.forEach(item => {
       item.totalPayout = item.totalCents / 100;
       item.cashPayout = item.cashCents / 100;
       item.ccPayout = item.ccCents / 100;
+      item.effectiveTipRate = item.biweeklyHours > 0 ? (item.totalPayout / item.biweeklyHours) : 0;
     });
 
+    const averageEffectiveTipRate = totalEligibleBiweeklyHours > 0 ? (totalTips / totalEligibleBiweeklyHours) : 0;
+
     return {
-      crew,
+      candidates: candidatesList,
       totalTips,
       cashTips,
       ccTips,
-      totalWorkingHours,
-      totalWeightedHours,
+      totalShiftHours,
+      totalEligibleBiweeklyHours,
+      totalAllBiweeklyHours,
+      averageEffectiveTipRate,
       reconciliationDiff: (totalCents - allocatedTotalCents) / 100
     };
   }
@@ -471,6 +498,10 @@
   // =========================================================================
   // DOM Renderers
   // =========================================================================
+
+  function getRoleSlug(role) {
+    return role.toLowerCase().replace(/[\s_]+/g, '');
+  }
 
   function renderShiftCards() {
     const grid = document.getElementById('scheduledShiftsGrid');
@@ -483,9 +514,8 @@
       if (!emp) return;
 
       const isSelected = state.selectedShiftId === shift.id;
-      const roleClass = shift.role.toLowerCase().replace(/\s+/g, '');
+      const roleSlug = getRoleSlug(shift.role);
 
-      // Check current weekly progress
       const otPct = Math.min(100, (emp.weeklyHours / 40.0) * 100);
       const isNearOt = emp.weeklyHours >= 36.0 && emp.weeklyHours <= 40.0;
       const isInOt = emp.weeklyHours > 40.0;
@@ -495,54 +525,69 @@
       card.setAttribute('data-shift-id', shift.id);
 
       card.innerHTML = `
-        <div>
+        <div class="shift-card-body">
           <div class="shift-card-header">
-            <div>
-              <div class="shift-emp-name">${emp.name}</div>
-              <span class="role-badge ${roleClass}">${shift.role}</span>
+            <div class="emp-profile">
+              <div class="emp-avatar ${roleSlug}">
+                ${emp.name.split(' ').map(n => n[0]).join('')}
+              </div>
+              <div>
+                <div class="shift-emp-name">${emp.name}</div>
+                <div class="role-badge-row">
+                  <span class="role-badge ${roleSlug}">${shift.role}</span>
+                  ${emp.isManager ? '<span class="flsa-pill-sm" title="FLSA Salaried Manager — Excluded from tips">FLSA Lead</span>' : ''}
+                </div>
+              </div>
             </div>
-            <div style="text-align: right;">
-              <span style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: #fff;">
-                ${shift.hours.toFixed(1)} hrs
-              </span>
+            <div class="shift-duration-badge">
+              <span class="hours-num">${shift.hours.toFixed(1)}</span>
+              <span class="hours-label">hrs tonight</span>
             </div>
           </div>
 
           <div class="shift-details">
             <div class="detail-line">
-              <span>Scheduled Time:</span>
-              <strong>${shift.startTime} – ${shift.endTime}</strong>
+              <span class="detail-label">Schedule Window:</span>
+              <span class="detail-val font-mono">${shift.startTime} – ${shift.endTime}</span>
             </div>
             <div class="detail-line">
-              <span>Station Assignment:</span>
-              <span>${shift.notes}</span>
+              <span class="detail-label">Station Assignment:</span>
+              <span class="detail-val">${shift.notes}</span>
             </div>
             <div class="detail-line">
-              <span>Base Pay Rate:</span>
-              <strong>${formatCurrency(emp.hourlyRate)}/hr</strong>
+              <span class="detail-label">Base Pay Rate:</span>
+              <span class="detail-val font-mono">${formatCurrency(emp.hourlyRate)}/hr</span>
             </div>
-            <div class="detail-line" style="margin-top: 0.25rem;">
-              <span>Weekly Hours Logged:</span>
-              <strong style="${isInOt ? 'color:#EF4444;' : isNearOt ? 'color:#F59E0B;' : ''}">
-                ${emp.weeklyHours.toFixed(1)} / 40.0h
-              </strong>
+            <div class="detail-line">
+              <span class="detail-label">Bi-Weekly Logged:</span>
+              <span class="detail-val biweekly-val font-mono">${(emp.biweeklyHours || (emp.weeklyHours * 2)).toFixed(1)} hrs</span>
             </div>
-            <div class="progress-bar-wrap" title="${emp.weeklyHours.toFixed(1)} hrs logged this week">
-              <div class="progress-fill ${isInOt ? 'in-ot' : isNearOt ? 'near-ot' : ''}" style="width: ${otPct}%;"></div>
+
+            <!-- Overtime Tracker Bar -->
+            <div class="ot-tracker-box">
+              <div class="ot-tracker-header">
+                <span class="ot-label">Weekly Hours Logged:</span>
+                <span class="ot-val font-mono ${isInOt ? 'ot-red' : isNearOt ? 'ot-amber' : ''}">
+                  ${emp.weeklyHours.toFixed(1)} / 40.0h
+                </span>
+              </div>
+              <div class="progress-bar-wrap" title="${emp.weeklyHours.toFixed(1)} hrs logged this week">
+                <div class="progress-fill ${isInOt ? 'in-ot' : isNearOt ? 'near-ot' : ''}" style="width: ${otPct}%;"></div>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="shift-card-actions">
-          <button class="btn-swap" data-action="toggle-swap" data-shift-id="${shift.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <button class="btn-swap ${isSelected ? 'selected' : ''}" data-action="toggle-swap" data-shift-id="${shift.id}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M16 3h5v5"></path>
               <path d="M4 20L21 3"></path>
               <path d="M21 16v5h-5"></path>
               <path d="M15 15l6 6"></path>
               <path d="M4 4l5 5"></path>
             </svg>
-            ${isSelected ? 'Currently Evaluating Coverage' : 'Request Cover / Swap'}
+            ${isSelected ? 'Evaluating Swap Candidates' : 'Request Cover / Swap'}
           </button>
         </div>
       `;
@@ -550,9 +595,8 @@
       grid.appendChild(card);
     });
 
-    // Update status indicators
     const countEl = document.getElementById('activeCrewCount');
-    if (countEl) countEl.textContent = `${state.shifts.length} Staff`;
+    if (countEl) countEl.textContent = `${state.shifts.length} Active Staff`;
   }
 
   function renderSwapEnginePanel() {
@@ -565,17 +609,22 @@
     if (!panel || !titleEl || !candidatesGrid) return;
 
     if (!state.selectedShiftId) {
-      titleEl.textContent = 'Select a shift above to request coverage';
-      subtitleEl.textContent = 'Comparing all off-duty employees against station certifications and 40.0-hour overtime limits.';
+      titleEl.textContent = 'Select any scheduled shift above to request coverage';
+      subtitleEl.textContent = 'Our deterministic validation engine automatically tests all off-duty staff against role qualifications ("Team Member" vs "Manager") and the 40.0-hour overtime limit.';
       actionContainer.innerHTML = '';
       candidatesGrid.innerHTML = `
         <div class="empty-state">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          <p>Click <strong>"Request Cover / Swap"</strong> on any scheduled employee above to evaluate eligible replacement staff.</p>
+          <div class="empty-icon-wrap">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 3h5v5"></path>
+              <path d="M4 20L21 3"></path>
+              <path d="M21 16v5h-5"></path>
+              <path d="M15 15l6 6"></path>
+              <path d="M4 4l5 5"></path>
+            </svg>
+          </div>
+          <h4>No Shift Selected for Coverage</h4>
+          <p>Click <strong>"Request Cover / Swap"</strong> on any scheduled employee above to evaluate available off-duty staff.</p>
         </div>
       `;
       updateCandidateFilterCounts(0, 0, 0, 0);
@@ -585,7 +634,7 @@
     const shift = getShiftById(state.selectedShiftId);
     const scheduledEmp = getEmployeeById(shift.employeeId);
 
-    titleEl.innerHTML = `Evaluating Replacement Coverage for <span style="color:#60A5FA;">${scheduledEmp.name}</span> (${shift.role} • ${shift.hours.toFixed(1)}h)`;
+    titleEl.innerHTML = `Evaluating Replacement Coverage for <span class="highlight-worker">${scheduledEmp.name}</span> (${shift.role} • ${shift.hours.toFixed(1)}h)`;
     subtitleEl.textContent = `Shift Window: ${shift.startTime} – ${shift.endTime} • Station: ${shift.notes}`;
 
     actionContainer.innerHTML = `
@@ -599,10 +648,8 @@
       renderAll();
     });
 
-    // Find all other staff members (not the person currently on the shift)
     const candidates = state.roster.filter(e => e.id !== scheduledEmp.id);
 
-    // Evaluate each candidate
     const evaluations = candidates.map(c => {
       const evalResult = evaluateCoverageCandidate(c, shift);
       return {
@@ -611,13 +658,11 @@
       };
     });
 
-    // Update filter counts
     const countSafe = evaluations.filter(e => e.status === 'safe').length;
     const countWarning = evaluations.filter(e => e.status === 'warning').length;
     const countMismatch = evaluations.filter(e => e.status === 'mismatch').length;
     updateCandidateFilterCounts(evaluations.length, countSafe, countWarning, countMismatch);
 
-    // Filter according to current active tab
     const filtered = evaluations.filter(e => {
       if (state.candidateFilter === 'all') return true;
       return e.status === state.candidateFilter;
@@ -628,7 +673,7 @@
     if (filtered.length === 0) {
       candidatesGrid.innerHTML = `
         <div class="empty-state">
-          <p>No candidates match the filter <strong>"${state.candidateFilter.toUpperCase()}"</strong>.</p>
+          <p>No candidates match the filter <strong>"${state.candidateFilter.toUpperCase()}"</strong> for this shift.</p>
         </div>
       `;
       return;
@@ -641,57 +686,57 @@
 
       const certsBadges = c.certifications.map(cert => {
         const matches = cert === shift.role;
-        return `<span class="cert-pill" style="${matches ? 'background:#1D4ED8;color:#fff;' : ''}">${cert}</span>`;
+        return `<span class="cert-pill ${matches ? 'matched' : ''}">${cert}</span>`;
       }).join(' ');
 
       let metricsHtml = '';
       if (item.status === 'safe') {
         metricsHtml = `
           <div class="metric-row">
-            <span>Current Weekly Hours:</span>
-            <strong>${c.weeklyHours.toFixed(1)} hrs</strong>
+            <span class="m-label">Current Weekly Hours:</span>
+            <span class="m-val font-mono">${c.weeklyHours.toFixed(1)} hrs</span>
           </div>
           <div class="metric-row">
-            <span>Projected with Shift:</span>
-            <strong style="color:#10B981;">${item.projectedHours.toFixed(1)} / 40.0 hrs (Safe)</strong>
+            <span class="m-label">Projected with Shift:</span>
+            <span class="m-val font-mono text-safe">${item.projectedHours.toFixed(1)} / 40.0 hrs (Safe)</span>
           </div>
           <div class="metric-row">
-            <span>Extra Overtime Cost:</span>
-            <strong style="color:#10B981;">$0.00 (Standard Wage: ${formatCurrency(c.hourlyRate)}/hr)</strong>
+            <span class="m-label">Overtime Cost Impact:</span>
+            <span class="m-val font-mono text-safe">$0.00 (Standard Wage: ${formatCurrency(c.hourlyRate)}/hr)</span>
           </div>
         `;
       } else if (item.status === 'warning') {
         metricsHtml = `
           <div class="metric-row">
-            <span>Current Weekly Hours:</span>
-            <strong>${c.weeklyHours.toFixed(1)} hrs</strong>
+            <span class="m-label">Current Weekly Hours:</span>
+            <span class="m-val font-mono">${c.weeklyHours.toFixed(1)} hrs</span>
           </div>
           <div class="metric-row highlight-ot">
-            <span>Projected Weekly Total:</span>
-            <strong>${item.projectedHours.toFixed(1)} hrs (> 40h)</strong>
+            <span class="m-label">Projected Weekly Total:</span>
+            <span class="m-val font-mono text-warning">${item.projectedHours.toFixed(1)} hrs (&gt; 40.0h)</span>
           </div>
           <div class="metric-row highlight-ot">
-            <span>Overtime Triggered:</span>
-            <strong>+${item.otHours.toFixed(1)} hrs at 1.5x (${formatCurrency(c.hourlyRate * 1.5)}/hr)</strong>
+            <span class="m-label">Overtime Triggered:</span>
+            <span class="m-val font-mono text-warning">+${item.otHours.toFixed(1)} hrs @ 1.5x (${formatCurrency(c.hourlyRate * 1.5)}/hr)</span>
           </div>
           <div class="metric-row highlight-ot">
-            <span>Overtime Cost Impact:</span>
-            <span>+${formatCurrency(item.extraCost)} premium (${formatCurrency(item.totalOtPay)} total OT pay)</span>
+            <span class="m-label">Extra Overtime Liability:</span>
+            <span class="m-val font-mono text-danger">+${formatCurrency(item.extraCost)} premium (${formatCurrency(item.totalOtPay)} total OT pay)</span>
           </div>
         `;
       } else {
         metricsHtml = `
           <div class="metric-row">
-            <span>Required Certification:</span>
+            <span class="m-label">Required Role Certification:</span>
             <span class="cert-pill missing">Requires '${shift.role}'</span>
           </div>
           <div class="metric-row">
-            <span>Current Station Badges:</span>
-            <span>${c.certifications.join(', ') || 'None'}</span>
+            <span class="m-label">Employee Certifications:</span>
+            <span class="detail-val">${c.certifications.join(', ') || 'None'}</span>
           </div>
           <div class="metric-row">
-            <span>Compliance Status:</span>
-            <span style="color:#94A3B8;">Station swap restricted</span>
+            <span class="m-label">Compliance Guardrail:</span>
+            <span class="text-neutral font-mono">${shift.role === 'Manager' ? 'Manager role restricted' : 'Lacks Team Member certification'}</span>
           </div>
         `;
       }
@@ -700,26 +745,27 @@
       if (item.status === 'safe') {
         buttonHtml = `
           <button class="btn-approve-swap safe" data-action="approve-swap" data-cand-id="${c.id}" data-shift-id="${shift.id}">
-            ✓ Approve Swap (No OT Cost)
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Approve Swap (Zero OT Liability)
           </button>
         `;
       } else if (item.status === 'warning') {
         buttonHtml = `
           <button class="btn-approve-swap warning" data-action="approve-swap" data-cand-id="${c.id}" data-shift-id="${shift.id}">
-            ⚠️ Approve with Overtime (+$${item.extraCost.toFixed(2)})
+            ⚠️ Approve with Overtime (+$${item.extraCost.toFixed(2)} Premium)
           </button>
         `;
       } else {
         buttonHtml = `
-          <button class="btn-approve-swap disabled" disabled title="Cannot swap: employee lacks station certification">
-            ⛔ Role Mismatch — Blocked
+          <button class="btn-approve-swap disabled" disabled title="Cannot swap: employee lacks ${shift.role} role certification">
+            ⛔ Role Mismatch — Swap Blocked
           </button>
         `;
       }
 
       card.innerHTML = `
         <div class="candidate-top">
-          <div>
+          <div class="cand-info">
             <div class="cand-name">${c.name}</div>
             <div class="cand-role-wage">${c.role} • Base ${formatCurrency(c.hourlyRate)}/hr</div>
           </div>
@@ -730,12 +776,12 @@
           ${metricsHtml}
         </div>
 
-        <div>
-          <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.25rem;">Certifications:</div>
+        <div class="candidate-certs-wrap">
+          <div class="certs-label">Active Certifications:</div>
           <div class="candidate-certs">${certsBadges}</div>
         </div>
 
-        <div>
+        <div class="candidate-actions">
           ${buttonHtml}
         </div>
       `;
@@ -765,28 +811,37 @@
     state.roster.forEach(emp => {
       const activeShift = state.shifts.find(s => s.employeeId === emp.id);
       const isWorking = !!activeShift;
+      const roleSlug = getRoleSlug(emp.role);
 
       const certPills = emp.certifications.map(c => `<span class="cert-pill">${c}</span>`).join(' ');
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
-          <strong>${emp.name}</strong>
-          ${emp.isManager ? '<span class="flsa-badge-table" title="FLSA Salaried/Lead — Excluded from tip pools">FLSA Exempt Lead</span>' : ''}
+          <div class="table-emp-cell">
+            <div class="table-avatar ${roleSlug}">${emp.name.split(' ').map(n => n[0]).join('')}</div>
+            <div>
+              <strong>${emp.name}</strong>
+              ${emp.isManager ? '<span class="flsa-badge-table" title="FLSA Salaried Manager — Excluded from tip pools">FLSA Exempt Manager</span>' : ''}
+            </div>
+          </div>
         </td>
-        <td>${emp.role}</td>
+        <td><span class="role-badge ${roleSlug}">${emp.role}</span></td>
         <td>${certPills}</td>
         <td class="num-col">${formatCurrency(emp.hourlyRate)}/hr</td>
         <td class="num-col" style="${emp.weeklyHours >= 36 ? (emp.weeklyHours > 40 ? 'color:#EF4444;font-weight:700;' : 'color:#F59E0B;font-weight:700;') : ''}">
           ${emp.weeklyHours.toFixed(1)} hrs
         </td>
-        <td>
-          ${isWorking 
-            ? `<span class="status-badge safe" style="font-size:0.65rem;">Working Tonight (${activeShift.hours}h)</span>` 
-            : `<span class="status-badge mismatch" style="font-size:0.65rem;">Off Floor (Available)</span>`}
+        <td class="num-col biweekly-cell font-mono">
+          <strong>${(emp.biweeklyHours !== undefined ? emp.biweeklyHours : (emp.weeklyHours * 2)).toFixed(1)} hrs</strong>
         </td>
         <td>
-          <button class="btn btn-outline" style="padding:0.25rem 0.5rem;font-size:0.75rem;" data-action="edit-hours" data-emp-id="${emp.id}">
+          ${isWorking 
+            ? `<span class="status-badge safe" style="font-size:0.7rem;">Working Tonight (${activeShift.hours}h)</span>` 
+            : `<span class="status-badge mismatch" style="font-size:0.7rem;">Off Floor (Available)</span>`}
+        </td>
+        <td>
+          <button class="btn btn-outline-sm" data-action="edit-hours" data-emp-id="${emp.id}" title="Edit weekly & bi-weekly hours">
             Adjust Hours
           </button>
         </td>
@@ -796,74 +851,45 @@
     });
   }
 
-  function renderRoleWeightSliders() {
-    const container = document.getElementById('roleWeightsList');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    const roles = ['Bartender', 'Server', 'Busser', 'Line Cook', 'Shift Lead'];
-
-    roles.forEach(role => {
-      const weight = state.roleWeights[role] !== undefined ? state.roleWeights[role] : 1.0;
-      const isShiftLead = role === 'Shift Lead';
-
-      const row = document.createElement('div');
-      row.className = 'weight-row';
-      row.innerHTML = `
-        <div class="weight-info">
-          <div class="weight-role-name">${role}</div>
-          <span style="font-size:0.7rem; color:var(--text-muted);">
-            ${isShiftLead ? 'FLSA Excluded (Manager)' : (weight === 0 ? 'Non-tipped' : 'Weighted Share')}
-          </span>
-        </div>
-        <div class="weight-slider-wrap">
-          <input type="range" 
-                 class="range-slider" 
-                 min="0.0" 
-                 max="2.0" 
-                 step="0.1" 
-                 value="${weight}" 
-                 data-role="${role}" 
-                 ${isShiftLead ? 'disabled style="opacity:0.3;cursor:not-allowed;"' : ''}>
-          <span class="weight-val-badge">${weight.toFixed(1)}x</span>
-        </div>
-      `;
-
-      container.appendChild(row);
-    });
-  }
-
   function renderTipCalculator() {
     const calc = calculateTipPool();
 
-    // Inputs
     const cashInput = document.getElementById('inputCashTips');
     const ccInput = document.getElementById('inputCcTips');
     if (cashInput && document.activeElement !== cashInput) cashInput.value = state.tips.cash;
     if (ccInput && document.activeElement !== ccInput) ccInput.value = state.tips.cc;
 
-    // Summary Banners
     const totalDisplay = document.getElementById('displayTotalTipPool');
     const miniCash = document.getElementById('miniCash');
     const miniCc = document.getElementById('miniCc');
+    const kpiEligibleHours = document.getElementById('kpiEligibleHours');
+    const kpiAvgRate = document.getElementById('kpiAvgRate');
+    const scopeCountDisplay = document.getElementById('scopeCountDisplay');
 
     if (totalDisplay) totalDisplay.textContent = formatCurrency(calc.totalTips);
     if (miniCash) miniCash.textContent = formatCurrency(calc.cashTips);
     if (miniCc) miniCc.textContent = formatCurrency(calc.ccTips);
+    if (kpiEligibleHours) kpiEligibleHours.textContent = `${calc.totalEligibleBiweeklyHours.toFixed(1)} hrs`;
+    if (kpiAvgRate) kpiAvgRate.textContent = `+${formatCurrency(calc.averageEffectiveTipRate)}/hr`;
+    if (scopeCountDisplay) {
+      scopeCountDisplay.textContent = `${calc.candidates.length} Staff (${calc.candidates.filter(c => c.isEligible).length} Eligible)`;
+    }
 
-    // Cent reconciliation
     const reconStatus = document.getElementById('reconciliationStatus');
     if (reconStatus) {
       if (Math.abs(calc.reconciliationDiff) < 0.001) {
         reconStatus.innerHTML = `<span class="badge-dot green"></span> Exact Cent Balanced: $0.00 Penny Remainder`;
-        reconStatus.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        reconStatus.className = 'reconciliation-badge balanced';
       } else {
         reconStatus.innerHTML = `<span class="badge-dot amber"></span> Variance: ${formatCurrency(calc.reconciliationDiff)}`;
+        reconStatus.className = 'reconciliation-badge variance';
       }
     }
 
-    // Table Body
+    document.querySelectorAll('.scope-toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-scope') === state.tipScope);
+    });
+
     const tbody = document.getElementById('tipPayoutTableBody');
     const tfoot = document.getElementById('tipPayoutTableFoot');
     if (!tbody || !tfoot) return;
@@ -873,54 +899,75 @@
     let sumCash = 0;
     let sumCc = 0;
     let sumTotal = 0;
+    let sumShiftHours = 0;
 
-    calc.crew.forEach(item => {
+    calc.candidates.forEach(item => {
       sumCash += item.cashPayout;
       sumCc += item.ccPayout;
       sumTotal += item.totalPayout;
+      sumShiftHours += item.shiftHours;
 
-      const isZero = item.weight === 0;
+      const isExcluded = !item.isEligible;
+      const roleSlug = getRoleSlug(item.role);
 
       const tr = document.createElement('tr');
+      tr.className = isExcluded ? 'row-flsa-excluded' : '';
+
       tr.innerHTML = `
         <td>
-          <strong>${item.employee.name}</strong>
-          ${item.employee.isManager ? '<span class="flsa-badge-table">FLSA Excluded</span>' : ''}
+          <div class="table-emp-cell">
+            <div class="table-avatar ${roleSlug}">${item.employee.name.split(' ').map(n => n[0]).join('')}</div>
+            <div>
+              <strong>${item.employee.name}</strong>
+              ${isExcluded ? '<span class="flsa-badge-table">FLSA Excluded (Manager)</span>' : ''}
+            </div>
+          </div>
         </td>
         <td>
-          <span class="role-badge ${item.role.toLowerCase().replace(/\s+/g, '')}">${item.role}</span>
+          <span class="role-badge ${roleSlug}">${item.role}</span>
+        </td>
+        <td class="num-col font-mono">
+          ${item.shiftHours > 0 ? `${item.shiftHours.toFixed(1)} hrs` : '<span class="text-muted">Off-Duty</span>'}
         </td>
         <td class="num-col">
-          <input type="number" 
-                 class="shift-hour-input" 
-                 min="0.5" 
-                 max="16.0" 
-                 step="0.5" 
-                 value="${item.hoursWorked}" 
-                 data-shift-id="${item.shiftId}">
+          <div class="biweekly-input-wrap">
+            <input type="number" 
+                   class="biweekly-hour-input" 
+                   min="0.0" 
+                   max="120.0" 
+                   step="0.5" 
+                   value="${item.biweeklyHours.toFixed(1)}" 
+                   data-emp-id="${item.employee.id}"
+                   title="Click to adjust bi-weekly logged hours">
+            <span class="input-unit">h</span>
+          </div>
         </td>
-        <td class="num-col" style="${isZero ? 'color:#64748B;' : ''}">${item.weight.toFixed(1)}x</td>
-        <td class="num-col" style="${isZero ? 'color:#64748B;' : ''}">${item.weightedHours.toFixed(2)}</td>
-        <td class="num-col" style="${isZero ? 'color:#64748B;' : ''}">${item.poolSharePercent.toFixed(1)}%</td>
-        <td class="num-col" style="color:#34D399;">${formatCurrency(item.cashPayout)}</td>
-        <td class="num-col" style="color:#93C5FD;">${formatCurrency(item.ccPayout)}</td>
-        <td class="num-col highlight-cell">${formatCurrency(item.totalPayout)}</td>
+        <td class="num-col font-mono" style="${isExcluded ? 'color:var(--text-muted);' : 'font-weight:600;'}">
+          ${item.poolSharePercent.toFixed(1)}%
+        </td>
+        <td class="num-col font-mono text-cash">
+          ${formatCurrency(item.cashPayout)}
+        </td>
+        <td class="num-col font-mono text-cc">
+          ${formatCurrency(item.ccPayout)}
+        </td>
+        <td class="num-col font-mono highlight-cell">
+          ${formatCurrency(item.totalPayout)}
+        </td>
       `;
 
       tbody.appendChild(tr);
     });
 
-    // Totals row in tfoot
     tfoot.innerHTML = `
       <tr>
-        <td colspan="2">TOTAL WORKING FLOOR POOL</td>
-        <td class="num-col">${calc.totalWorkingHours.toFixed(1)} hrs</td>
-        <td class="num-col">—</td>
-        <td class="num-col">${calc.totalWeightedHours.toFixed(2)} pts</td>
-        <td class="num-col">100.0%</td>
-        <td class="num-col" style="color:#34D399;">${formatCurrency(sumCash)}</td>
-        <td class="num-col" style="color:#93C5FD;">${formatCurrency(sumCc)}</td>
-        <td class="num-col highlight-cell">${formatCurrency(sumTotal)}</td>
+        <td colspan="2">TOTAL BI-WEEKLY DISTRIBUTION POOL</td>
+        <td class="num-col font-mono">${sumShiftHours.toFixed(1)} hrs</td>
+        <td class="num-col font-mono"><strong>${calc.totalEligibleBiweeklyHours.toFixed(1)} eligible hrs</strong></td>
+        <td class="num-col font-mono">100.0%</td>
+        <td class="num-col font-mono text-cash">${formatCurrency(sumCash)}</td>
+        <td class="num-col font-mono text-cc">${formatCurrency(sumCc)}</td>
+        <td class="num-col font-mono highlight-cell">${formatCurrency(sumTotal)}</td>
       </tr>
     `;
   }
@@ -932,17 +979,19 @@
     const slipCashTips = document.getElementById('slipCashTips');
     const slipCcTips = document.getElementById('slipCcTips');
     const slipTotalHours = document.getElementById('slipTotalHours');
-    const slipTotalWeighted = document.getElementById('slipTotalWeighted');
+    const slipTotalBiweekly = document.getElementById('slipTotalBiweekly');
     const slipCrewList = document.getElementById('slipCrewList');
     const slipDate = document.getElementById('slipDate');
     const slipTimestamp = document.getElementById('slipTimestamp');
     const slipReconciliation = document.getElementById('slipReconciliation');
+    const slipScope = document.getElementById('slipScope');
 
     if (slipTotalPool) slipTotalPool.textContent = formatCurrency(calc.totalTips);
     if (slipCashTips) slipCashTips.textContent = formatCurrency(calc.cashTips);
     if (slipCcTips) slipCcTips.textContent = formatCurrency(calc.ccTips);
-    if (slipTotalHours) slipTotalHours.textContent = `${calc.totalWorkingHours.toFixed(1)} hrs`;
-    if (slipTotalWeighted) slipTotalWeighted.textContent = `${calc.totalWeightedHours.toFixed(2)} pts`;
+    if (slipTotalHours) slipTotalHours.textContent = `${calc.totalShiftHours.toFixed(1)} hrs`;
+    if (slipTotalBiweekly) slipTotalBiweekly.textContent = `${calc.totalEligibleBiweeklyHours.toFixed(1)} eligible hrs`;
+    if (slipScope) slipScope.textContent = state.tipScope === 'all' ? 'All Store Staff (8)' : "Tonight's Working Crew";
 
     const now = new Date();
     if (slipDate) slipDate.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -954,16 +1003,16 @@
 
     if (slipCrewList) {
       slipCrewList.innerHTML = '';
-      calc.crew.forEach(item => {
+      calc.candidates.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = 'slip-item';
+        itemDiv.className = `slip-item ${!item.isEligible ? 'slip-excluded' : ''}`;
         itemDiv.innerHTML = `
           <div class="slip-item-top">
-            <span>${item.employee.name} (${item.role})</span>
-            <span>${formatCurrency(item.totalPayout)}</span>
+            <span class="slip-item-name">${item.employee.name} (${item.role})</span>
+            <span class="slip-item-total font-mono">${formatCurrency(item.totalPayout)}</span>
           </div>
           <div class="slip-item-sub">
-            <span>${item.hoursWorked}h × ${item.weight.toFixed(1)}w = ${item.weightedHours.toFixed(1)} pts (${item.poolSharePercent.toFixed(1)}%)</span>
+            <span>${item.biweeklyHours.toFixed(1)}h bi-weekly (${item.poolSharePercent.toFixed(1)}%)</span>
             <span>Cash: ${formatCurrency(item.cashPayout)} | CC: ${formatCurrency(item.ccPayout)}</span>
           </div>
         `;
@@ -976,7 +1025,6 @@
     renderShiftCards();
     renderSwapEnginePanel();
     renderRosterTable();
-    renderRoleWeightSliders();
     renderTipCalculator();
   }
 
@@ -997,8 +1045,8 @@
     if (type === 'error') icon = '⛔';
 
     toast.innerHTML = `
-      <span style="font-weight:700;">${icon}</span>
-      <div>${message}</div>
+      <span class="toast-icon">${icon}</span>
+      <div class="toast-body">${message}</div>
     `;
 
     container.appendChild(toast);
@@ -1008,7 +1056,7 @@
       toast.style.transform = 'translateY(8px)';
       toast.style.transition = 'all 0.25s ease';
       setTimeout(() => toast.remove(), 260);
-    }, 4000);
+    }, 4200);
   }
 
   // =========================================================================
@@ -1016,24 +1064,22 @@
   // =========================================================================
 
   function loadSampleScenario() {
-    // Reset to clean baseline
     state.roster = JSON.parse(JSON.stringify(INITIAL_ROSTER));
     state.shifts = JSON.parse(JSON.stringify(INITIAL_SHIFTS));
     state.tips = { cash: 240.00, cc: 860.00 }; // $1,100 pool
-    state.roleWeights = JSON.parse(JSON.stringify(DEFAULT_WEIGHTS));
+    state.tipScope = 'crew';
     state.shiftHoursOverride = {};
 
-    // Select Shift 1 (Jordan Miller - Server, 6.0 hrs) to illustrate swap engine immediately
+    // Select Shift 1 (Jordan Miller - Team Member, 6.0 hrs) to illustrate swap engine immediately
     state.selectedShiftId = 'shift-1';
     state.candidateFilter = 'all';
 
     saveState();
     renderAll();
 
-    // Switch to Tab 1 to see the swap engine in action
     switchTab('tabSwapValidator');
 
-    showToast('⚡ Friday Dinner Rush loaded! Jordan Miller (Server) needs coverage. Check Maya Lin (Overtime Alert) & Elena (Safe).', 'warning');
+    showToast('⚡ Friday Dinner Rush loaded! Jordan Miller (Team Member) selected. Check Maya Lin (Overtime Alert), Elena (Safe), and Chloe (Role Mismatch).', 'warning');
   }
 
   // =========================================================================
@@ -1059,7 +1105,6 @@
   // =========================================================================
 
   function setupEventListeners() {
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const tabId = btn.getAttribute('data-tab');
@@ -1067,15 +1112,13 @@
       });
     });
 
-    // Demo Scenario & Reset Buttons
     document.getElementById('btnQuickDemo')?.addEventListener('click', loadSampleScenario);
     document.getElementById('btnResetData')?.addEventListener('click', () => {
-      if (confirm('Reset all shifts, roster weekly hours, and tip calculations back to original sample data?')) {
+      if (confirm('Reset all shifts, weekly/bi-weekly hours, and tip pool calculations back to synthetic sample data?')) {
         resetState();
       }
     });
 
-    // Candidate Filter Chips
     document.querySelector('.candidate-filters')?.addEventListener('click', (e) => {
       const chip = e.target.closest('.filter-chip');
       if (!chip) return;
@@ -1087,14 +1130,12 @@
       renderSwapEnginePanel();
     });
 
-    // Shift Card Clicks & Swap Approvals Delegation
     document.addEventListener('click', (e) => {
-      // Toggle Swap Request
       const swapBtn = e.target.closest('[data-action="toggle-swap"]');
       if (swapBtn) {
         const shiftId = swapBtn.getAttribute('data-shift-id');
         if (state.selectedShiftId === shiftId) {
-          state.selectedShiftId = null; // deselect
+          state.selectedShiftId = null;
         } else {
           state.selectedShiftId = shiftId;
         }
@@ -1103,7 +1144,6 @@
         return;
       }
 
-      // Approve Swap
       const approveBtn = e.target.closest('[data-action="approve-swap"]');
       if (approveBtn) {
         const candId = approveBtn.getAttribute('data-cand-id');
@@ -1112,28 +1152,59 @@
         return;
       }
 
-      // Edit Weekly Hours from Roster table
       const editBtn = e.target.closest('[data-action="edit-hours"]');
       if (editBtn) {
         const empId = editBtn.getAttribute('data-emp-id');
         const emp = getEmployeeById(empId);
         if (emp) {
-          const newHoursStr = prompt(`Enter updated weekly hours logged for ${emp.name}:`, emp.weeklyHours);
-          if (newHoursStr !== null) {
-            const parsed = parseFloat(newHoursStr);
-            if (!isNaN(parsed) && parsed >= 0) {
-              emp.weeklyHours = parseFloat(parsed.toFixed(1));
+          const newWeeklyStr = prompt(`Enter updated Weekly Hours logged for ${emp.name} (currently ${emp.weeklyHours}h):`, emp.weeklyHours);
+          if (newWeeklyStr !== null) {
+            const parsedWeekly = parseFloat(newWeeklyStr);
+            if (!isNaN(parsedWeekly) && parsedWeekly >= 0) {
+              emp.weeklyHours = parseFloat(parsedWeekly.toFixed(1));
+              
+              const newBiweeklyStr = prompt(`Enter updated Bi-Weekly Hours logged for ${emp.name} (currently ${emp.biweeklyHours || emp.weeklyHours * 2}h):`, emp.biweeklyHours || (emp.weeklyHours * 2));
+              if (newBiweeklyStr !== null) {
+                const parsedBiweekly = parseFloat(newBiweeklyStr);
+                if (!isNaN(parsedBiweekly) && parsedBiweekly >= 0) {
+                  emp.biweeklyHours = parseFloat(parsedBiweekly.toFixed(1));
+                }
+              }
+              
               saveState();
               renderAll();
-              showToast(`Updated ${emp.name}'s weekly hours to ${emp.weeklyHours}h.`, 'info');
+              showToast(`Updated ${emp.name}: Weekly ${emp.weeklyHours}h, Bi-Weekly ${emp.biweeklyHours}h.`, 'info');
             }
           }
         }
         return;
       }
+
+      const scopeBtn = e.target.closest('.scope-toggle-btn');
+      if (scopeBtn) {
+        const scope = scopeBtn.getAttribute('data-scope');
+        if (scope && scope !== state.tipScope) {
+          state.tipScope = scope;
+          saveState();
+          renderTipCalculator();
+          showToast(`Switched tip pool distribution scope to ${scope === 'all' ? 'All Store Staff (8)' : "Tonight's Working Floor Crew"}.`, 'info');
+        }
+        return;
+      }
+
+      const tipPresetBtn = e.target.closest('.btn-tip-preset');
+      if (tipPresetBtn) {
+        const cashVal = parseFloat(tipPresetBtn.getAttribute('data-cash')) || 0;
+        const ccVal = parseFloat(tipPresetBtn.getAttribute('data-cc')) || 0;
+        state.tips.cash = cashVal;
+        state.tips.cc = ccVal;
+        saveState();
+        renderTipCalculator();
+        showToast(`Loaded ${formatCurrency(cashVal + ccVal)} tip preset (${formatCurrency(cashVal)} cash / ${formatCurrency(ccVal)} CC).`, 'info');
+        return;
+      }
     });
 
-    // Tip Pool Inputs
     document.getElementById('inputCashTips')?.addEventListener('input', (e) => {
       state.tips.cash = parseFloat(e.target.value) || 0;
       saveState();
@@ -1146,46 +1217,24 @@
       renderTipCalculator();
     });
 
-    // Reset Weights
-    document.getElementById('btnResetWeights')?.addEventListener('click', () => {
-      state.roleWeights = JSON.parse(JSON.stringify(DEFAULT_WEIGHTS));
-      saveState();
-      renderRoleWeightSliders();
-      renderTipCalculator();
-      showToast('Role multipliers reset to restaurant standards.', 'info');
-    });
-
-    // Weight slider changes
-    document.getElementById('roleWeightsList')?.addEventListener('input', (e) => {
-      if (e.target.classList.contains('range-slider')) {
-        const role = e.target.getAttribute('data-role');
-        const val = parseFloat(e.target.value);
-        if (role && !isNaN(val)) {
-          state.roleWeights[role] = val;
-          // Update badge next to slider
-          const badge = e.target.parentElement.querySelector('.weight-val-badge');
-          if (badge) badge.textContent = `${val.toFixed(1)}x`;
-          saveState();
-          renderTipCalculator();
-        }
-      }
-    });
-
-    // Actual Shift Hours Override (Late in/Early out)
     document.getElementById('tipPayoutTableBody')?.addEventListener('change', (e) => {
-      if (e.target.classList.contains('shift-hour-input')) {
-        const shiftId = e.target.getAttribute('data-shift-id');
+      if (e.target.classList.contains('biweekly-hour-input')) {
+        const empId = e.target.getAttribute('data-emp-id');
         const val = parseFloat(e.target.value);
-        if (shiftId && !isNaN(val) && val > 0) {
-          state.shiftHoursOverride[shiftId] = val;
-          saveState();
-          renderTipCalculator();
-          showToast(`Shift hours adjusted to ${val} hrs for tip allocation.`, 'info');
+        if (empId && !isNaN(val) && val >= 0) {
+          const emp = getEmployeeById(empId);
+          if (emp) {
+            emp.biweeklyHours = parseFloat(val.toFixed(1));
+            saveState();
+            renderTipCalculator();
+            renderRosterTable();
+            renderShiftCards();
+            showToast(`Updated ${emp.name}'s bi-weekly hours to ${emp.biweeklyHours}h. Tip pool re-balanced!`, 'info');
+          }
         }
       }
     });
 
-    // Modal Actions (Print Slip)
     const modal = document.getElementById('receiptModal');
     const openReceiptModal = () => {
       renderReceiptModal();
@@ -1207,18 +1256,20 @@
       window.print();
     });
 
-    // Download text record
     document.getElementById('btnModalDownload')?.addEventListener('click', () => {
       const calc = calculateTipPool();
-      let text = `THE COPPER OAK BISTRO — SHIFT CLOSEOUT & TIP POOL\n`;
+      let text = `THE COPPER OAK BISTRO — SHIFT CLOSEOUT & BI-WEEKLY TIP POOL\n`;
       text += `Date: ${new Date().toLocaleDateString()} | Time: ${new Date().toLocaleTimeString()}\n`;
+      text += `Scope: ${state.tipScope === 'all' ? 'All Store Staff (8)' : "Tonight's Working Floor Crew"}\n`;
       text += `Total Tip Pool: ${formatCurrency(calc.totalTips)} (Cash: ${formatCurrency(calc.cashTips)} | CC: ${formatCurrency(calc.ccTips)})\n`;
+      text += `Total Eligible Bi-Weekly Hours: ${calc.totalEligibleBiweeklyHours.toFixed(1)} hrs\n`;
       text += `--------------------------------------------------\n`;
-      calc.crew.forEach(c => {
-        text += `${c.employee.name.padEnd(18)} [${c.role.padEnd(10)}] | ${c.hoursWorked}h (${c.poolSharePercent.toFixed(1)}%) -> Cash: ${formatCurrency(c.cashPayout)} | CC: ${formatCurrency(c.ccPayout)} | Total: ${formatCurrency(c.totalPayout)}\n`;
+      calc.candidates.forEach(c => {
+        const statusNote = c.isEligible ? `${c.biweeklyHours.toFixed(1)}h (${c.poolSharePercent.toFixed(1)}%)` : 'FLSA EXEMPT (0%)';
+        text += `${c.employee.name.padEnd(18)} [${c.role.padEnd(12)}] | ${statusNote.padEnd(14)} -> Cash: ${formatCurrency(c.cashPayout).padEnd(9)} | CC: ${formatCurrency(c.ccPayout).padEnd(9)} | Total: ${formatCurrency(c.totalPayout)}\n`;
       });
       text += `--------------------------------------------------\n`;
-      text += `Penny Variance: ${formatCurrency(calc.reconciliationDiff)}\nFLSA Compliance: Passed (Managers Excluded)\n`;
+      text += `Penny Variance: ${formatCurrency(calc.reconciliationDiff)}\nFLSA Labor Audit Check: PASSED (Managers Excluded under 29 U.S.C. § 203(m)(2)(B))\n`;
 
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -1232,13 +1283,16 @@
       showToast('Shift record downloaded as text slip.', 'success');
     });
 
-    // Copy Summary to clipboard
     document.getElementById('btnCopySummaryBtn')?.addEventListener('click', () => {
       const calc = calculateTipPool();
-      let text = `✦ SHIFT TIP POOL SUMMARY ✦\n`;
-      text += `Total Pool: ${formatCurrency(calc.totalTips)} (Cash: ${formatCurrency(calc.cashTips)} | CC: ${formatCurrency(calc.ccTips)})\n`;
-      calc.crew.forEach(c => {
-        text += `• ${c.employee.name} (${c.role}): Total ${formatCurrency(c.totalPayout)} (Cash ${formatCurrency(c.cashPayout)}, CC ${formatCurrency(c.ccPayout)})\n`;
+      let text = `✦ BI-WEEKLY TIP POOL SETTLEMENT SUMMARY ✦\n`;
+      text += `Scope: ${state.tipScope === 'all' ? 'All Store Staff' : "Tonight's Crew"} | Total Pool: ${formatCurrency(calc.totalTips)} (Cash: ${formatCurrency(calc.cashTips)} | CC: ${formatCurrency(calc.ccTips)})\n`;
+      calc.candidates.forEach(c => {
+        if (c.isEligible) {
+          text += `• ${c.employee.name} (${c.role}): Total ${formatCurrency(c.totalPayout)} [Cash: ${formatCurrency(c.cashPayout)}, CC: ${formatCurrency(c.ccPayout)}] (${c.biweeklyHours}h bi-weekly)\n`;
+        } else {
+          text += `• ${c.employee.name} (${c.role}): FLSA Excluded ($0.00 tip share)\n`;
+        }
       });
       navigator.clipboard.writeText(text).then(() => {
         showToast('Tip distribution summary copied to clipboard!', 'success');
@@ -1258,7 +1312,6 @@
     renderAll();
   }
 
-  // Run on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
