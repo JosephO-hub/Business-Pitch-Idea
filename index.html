@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shift-Coverage & Tip-Pool Optimizer</title>
+  <meta name="description" content="Deterministic shift-swap validator and FLSA-compliant weighted tip-pool calculator for restaurant shift leads and hospitality managers.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Header Banner -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title-wrap">
+            <h1 class="brand-title">Shift-Coverage &amp; Tip-Pool Optimizer</h1>
+            <span class="version-tag">v1.0 • Ready for GitHub Pages</span>
+          </div>
+          <p class="brand-subtitle">Deterministic swap validation with 1.5x overtime costing &amp; FLSA-compliant weighted tip allocation</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btnQuickDemo" class="btn btn-demo" title="Load realistic Friday dinner rush with tips to test in seconds">
+          <span class="btn-icon">⚡</span>
+          <span class="btn-text">Try It in 2 Minutes</span>
+          <span class="badge-pulse">Quick Fill</span>
+        </button>
+        <button id="btnResetData" class="btn btn-secondary" title="Reset all changes back to synthetic 8-person restaurant roster">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          Reset to Sample Data
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Status Strip -->
+    <div class="status-strip">
+      <div class="status-item">
+        <span class="status-dot green"></span>
+        <span>Active Service: <strong id="currentShiftName">Friday Dinner Service</strong></span>
+      </div>
+      <div class="status-divider">•</div>
+      <div class="status-item">
+        <span>Working Floor Crew: <strong id="activeCrewCount">6 Staff</strong></span>
+      </div>
+      <div class="status-divider">•</div>
+      <div class="status-item">
+        <span>Overtime Threshold: <strong>40.0 hrs/week</strong> (1.5x wage penalty)</span>
+      </div>
+      <div class="status-divider">•</div>
+      <div class="status-item">
+        <span class="flsa-pill" title="Managers and supervisors are strictly barred from employee tip pools under FLSA section 3(m)(2)(B)">
+          🛡️ FLSA Tip Compliance Guard Active
+        </span>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <nav class="tab-nav" aria-label="Main application tabs">
+      <button class="tab-btn active" data-tab="tabSwapValidator" id="tabBtn1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+        </svg>
+        <span>1. Active Shift &amp; Swap Validator</span>
+        <span class="tab-badge" id="swapPendingCount">Ready</span>
+      </button>
+
+      <button class="tab-btn" data-tab="tabTipCalculator" id="tabBtn2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        <span>2. End-of-Night Tip-Pool Split</span>
+        <span class="tab-badge sync-badge" id="tipPoolCrewSync">Synced</span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    <!-- ============================================================== -->
+    <!-- TAB 1: ACTIVE SHIFT & SWAP VALIDATOR                           -->
+    <!-- ============================================================== -->
+    <section id="tabSwapValidator" class="tab-pane active" aria-labelledby="tabBtn1">
+      <div class="section-intro">
+        <div>
+          <h2 class="section-title">Tonight's Scheduled Floor Roster</h2>
+          <p class="section-desc">Select any scheduled shift below to initiate a coverage request or emergency swap. The system checks hourly limits, role certifications, and computes exact 1.5x overtime financial liability.</p>
+        </div>
+        <div class="legend-bar">
+          <span class="legend-tag safe"><span class="badge-dot green"></span> Safe to Approve</span>
+          <span class="legend-tag warning"><span class="badge-dot amber"></span> Overtime Alert</span>
+          <span class="legend-tag mismatch"><span class="badge-dot gray"></span> Role Mismatch</span>
+        </div>
+      </div>
+
+      <!-- Tonight's Shifts Grid -->
+      <div class="grid-shifts" id="scheduledShiftsGrid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+      <!-- Swap Analysis Panel (Activates upon selecting a shift) -->
+      <div class="swap-engine-panel" id="swapEnginePanel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <span class="sub-badge">LIVE VALIDATION ENGINE</span>
+            <h3 class="panel-title" id="swapTargetTitle">Select a shift above to request coverage</h3>
+            <p class="panel-subtitle" id="swapTargetSubtitle">Comparing all off-duty employees against station certifications and 40.0-hour overtime limits.</p>
+          </div>
+          <div class="panel-header-right" id="swapTargetActionContainer">
+            <!-- Dynamic cancel or info -->
+          </div>
+        </div>
+
+        <!-- Filter tabs for swap candidates -->
+        <div class="candidate-filters">
+          <button class="filter-chip active" data-filter="all">All Candidates (<span id="countAll">0</span>)</button>
+          <button class="filter-chip safe" data-filter="safe">🟢 Safe to Approve (<span id="countSafe">0</span>)</button>
+          <button class="filter-chip warning" data-filter="warning">⚠️ Overtime Alerts (<span id="countWarning">0</span>)</button>
+          <button class="filter-chip mismatch" data-filter="mismatch">⛔ Role Mismatch (<span id="countMismatch">0</span>)</button>
+        </div>
+
+        <!-- Candidate Cards Container -->
+        <div class="candidates-grid" id="swapCandidatesGrid">
+          <div class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>Click <strong>"Request Cover / Swap"</strong> on any scheduled employee above to evaluate eligible replacement staff.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Master Roster Overview -->
+      <div class="roster-section">
+        <div class="roster-header">
+          <div>
+            <h3 class="section-title">Synthetic Restaurant Roster (8 Team Members)</h3>
+            <p class="section-desc">Baseline database with role certifications and current weekly hours. Notice Maya (37.0h) &amp; Marcus (36.5h) primed for overtime alert testing.</p>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-responsive">
+            <table class="data-table" id="rosterTable">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Primary Role</th>
+                  <th>Station Certifications</th>
+                  <th>Hourly Rate</th>
+                  <th>Weekly Hours Logged</th>
+                  <th>Tonight's Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="rosterTableBody">
+                <!-- Populated via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: END-OF-NIGHT TIP-POOL SPLIT                             -->
+    <!-- ============================================================== -->
+    <section id="tabTipCalculator" class="tab-pane" aria-labelledby="tabBtn2">
+      <div class="section-intro">
+        <div>
+          <h2 class="section-title">Deterministic Tip-Pool Allocation Engine</h2>
+          <p class="section-desc">Pulls tonight's verified working floor crew directly from Tab 1. Enter cash and credit card tips to calculate proportional weighted payouts down to the exact cent.</p>
+        </div>
+        <div class="section-intro-actions">
+          <button id="btnPrintReceiptBtn" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Print Shift &amp; Tip Slip
+          </button>
+          <button id="btnCopySummaryBtn" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy Summary
+          </button>
+        </div>
+      </div>
+
+      <!-- Tip Pool Input & Summary Metrics -->
+      <div class="tip-inputs-row">
+        <!-- Input Card -->
+        <div class="tip-box input-box">
+          <h3 class="box-title">1. Enter Shift Tip Receipts</h3>
+          <div class="input-group-grid">
+            <div class="form-group">
+              <label for="inputCashTips">
+                <span class="label-badge cash">CASH</span>
+                Total Cash Tips ($)
+              </label>
+              <div class="currency-input-wrap">
+                <span class="currency-sym">$</span>
+                <input type="number" id="inputCashTips" class="form-input" min="0" step="1" value="240.00" placeholder="0.00">
+              </div>
+              <span class="help-text">Distributed tonight as cash take-home</span>
+            </div>
+
+            <div class="form-group">
+              <label for="inputCcTips">
+                <span class="label-badge cc">CREDIT CARD</span>
+                Total Credit Card Tips ($)
+              </label>
+              <div class="currency-input-wrap">
+                <span class="currency-sym">$</span>
+                <input type="number" id="inputCcTips" class="form-input" min="0" step="1" value="860.00" placeholder="0.00">
+              </div>
+              <span class="help-text">Paid out on next bi-weekly payroll</span>
+            </div>
+          </div>
+
+          <!-- Total Pool Summary -->
+          <div class="total-pool-banner">
+            <div>
+              <span class="pool-label">TOTAL SHIFT TIP POOL</span>
+              <div class="pool-value" id="displayTotalTipPool">$1,100.00</div>
+            </div>
+            <div class="pool-metrics">
+              <div class="mini-metric">
+                <span class="label">Cash:</span>
+                <span class="val" id="miniCash">$240.00</span>
+              </div>
+              <div class="mini-metric">
+                <span class="label">CC:</span>
+                <span class="val" id="miniCc">$860.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Role Weights Configuration -->
+        <div class="tip-box weights-box">
+          <div class="box-title-row">
+            <h3 class="box-title">2. Role Weight Multipliers</h3>
+            <button id="btnResetWeights" class="btn-text-action" title="Reset weights to restaurant standards">Reset Weights</button>
+          </div>
+          <p class="box-desc">Standard restaurant distribution weights. Adjust sliders to adjust distribution rates transparently.</p>
+          
+          <div class="weights-sliders-list" id="roleWeightsList">
+            <!-- Dynamic Role Weight Sliders -->
+          </div>
+
+          <div class="flsa-compliance-callout">
+            <div class="callout-icon">⚖️</div>
+            <div class="callout-body">
+              <strong>FLSA Labor Standard Guardrail:</strong>
+              <p>Under federal FLSA rules, Shift Leads &amp; Managers cannot participate in employee tip pools. Shift Lead weight is locked to 0.0x.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formula Visualizer Strip -->
+      <div class="formula-strip">
+        <div class="formula-tag">MATHEMATICAL FORMULA:</div>
+        <code class="formula-code">
+          Employee Tip = Total Pool × [ (Hours Worked × Role Weight) ÷ Sum of All Weighted Hours ]
+        </code>
+        <div class="reconciliation-badge" id="reconciliationStatus">
+          <span class="badge-dot green"></span>
+          Exact Cent Balanced: $0.00 Penny Remainder
+        </div>
+      </div>
+
+      <!-- Itemized Distribution Table -->
+      <div class="table-card">
+        <div class="table-header-bar">
+          <div>
+            <h3 class="card-heading">Tonight's Working Crew Payout Breakdown</h3>
+            <span class="card-subheading">Hours pulled live from Tab 1. You may adjust hours worked tonight if an employee clocked in/out early.</span>
+          </div>
+          <div class="sync-indicator">
+            <span class="sync-dot"></span> Real-Time Sync with Tab 1
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="tipPayoutTable">
+            <thead>
+              <tr>
+                <th>Team Member</th>
+                <th>Shift Role</th>
+                <th class="num-col">Shift Hours</th>
+                <th class="num-col">Weight</th>
+                <th class="num-col">Weighted Pts</th>
+                <th class="num-col">Pool Share %</th>
+                <th class="num-col">Cash Share</th>
+                <th class="num-col">CC Share (Payroll)</th>
+                <th class="num-col highlight-header">Total Tip Payout</th>
+              </tr>
+            </thead>
+            <tbody id="tipPayoutTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+            <tfoot id="tipPayoutTableFoot">
+              <!-- Totals row rendered via JS -->
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: PRINT / SHIFT RECEIPT VIEW                              -->
+  <!-- ============================================================== -->
+  <div id="receiptModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Verified Shift &amp; Tip Slip</h3>
+        <button id="btnCloseModal" class="btn-close" aria-label="Close Modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Printable Slip Card -->
+        <div class="receipt-slip" id="printableReceipt">
+          <div class="slip-header">
+            <div class="slip-logo">✦ THE COPPER OAK BISTRO ✦</div>
+            <div class="slip-sub">SHIFT CLOSEOUT &amp; TIP POOL SETTLEMENT</div>
+            <div class="slip-meta">
+              <div><strong>Shift:</strong> <span id="slipShiftName">Friday Dinner Rush</span></div>
+              <div><strong>Date:</strong> <span id="slipDate">Nov 18, 2026</span></div>
+              <div><strong>Generated:</strong> <span id="slipTimestamp">11:15 PM</span></div>
+              <div><strong>Shift Lead:</strong> <span id="slipLeadName">Rachel Greene</span></div>
+            </div>
+          </div>
+
+          <div class="slip-divider">------------------------------------------------</div>
+
+          <div class="slip-totals">
+            <div class="slip-row">
+              <span>Total Cash Tips:</span>
+              <span id="slipCashTips">$240.00</span>
+            </div>
+            <div class="slip-row">
+              <span>Total Credit Card Tips:</span>
+              <span id="slipCcTips">$860.00</span>
+            </div>
+            <div class="slip-row bold total-line">
+              <span>TOTAL TIP POOL:</span>
+              <span id="slipTotalPool">$1,100.00</span>
+            </div>
+            <div class="slip-row muted">
+              <span>Total Working Hours:</span>
+              <span id="slipTotalHours">38.0 hrs</span>
+            </div>
+            <div class="slip-row muted">
+              <span>Total Weighted Points:</span>
+              <span id="slipTotalWeighted">33.0 pts</span>
+            </div>
+          </div>
+
+          <div class="slip-divider">------------------------------------------------</div>
+
+          <div class="slip-crew-title">CREW ITEMIZATION &amp; PAYOUTS</div>
+          <div class="slip-crew-list" id="slipCrewList">
+            <!-- Populated via JS -->
+          </div>
+
+          <div class="slip-divider">------------------------------------------------</div>
+
+          <div class="slip-audit">
+            <div class="slip-row">
+              <span>Penny Reconciliation:</span>
+              <span id="slipReconciliation">100.0% Exact Match ($0.00 var)</span>
+            </div>
+            <div class="slip-row">
+              <span>FLSA Audit Check:</span>
+              <span>PASSED (Managers Excluded)</span>
+            </div>
+          </div>
+
+          <div class="slip-signatures">
+            <div class="sig-block">
+              <div class="sig-line"></div>
+              <span>Shift Lead Signature</span>
+            </div>
+            <div class="sig-block">
+              <div class="sig-line"></div>
+              <span>GM / Manager Sign-off</span>
+            </div>
+          </div>
+
+          <div class="slip-footer">
+            Printed from Shift-Coverage &amp; Tip-Pool Optimizer v1.0<br>
+            Tamper-proof deterministic calculation record.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnModalPrint" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Slip Now
+        </button>
+        <button id="btnModalDownload" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download Text Record
+        </button>
+        <button id="btnModalCloseSecondary" class="btn btn-outline">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <span>Built to the <code>/shift-tip-standards</code> standard. Pure static HTML5, CSS3, &amp; ES6 JavaScript.</span>
+      <span class="footer-meta">GitHub Pages Compatible • Zero Backend Dependencies</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
