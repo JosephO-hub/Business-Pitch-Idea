@@ -822,22 +822,22 @@
         const eligibleStaffCount = calc.crew.filter(c => c.weight > 0).length;
 
         kpiGridContainer.innerHTML = `
-          <div class="kpi-card" data-action="go-shifts">
+          <div class="kpi-card" data-action="go-shifts" role="button" tabindex="0" title="Click to view shift coverage">
             <div class="kpi-card-top"><span class="kpi-label">Coverage needed</span><span class="kpi-icon-wrap icon-peach">📅</span></div>
             <div class="kpi-value">${coverageNeeded}</div>
             <div class="kpi-subtext">Open or up for grabs</div>
           </div>
-          <div class="kpi-card" data-action="go-approvals">
+          <div class="kpi-card" data-action="go-approvals" role="button" tabindex="0" title="Click to view pending approvals">
             <div class="kpi-card-top"><span class="kpi-label">Pending approvals</span><span class="kpi-icon-wrap icon-peach">📋</span></div>
             <div class="kpi-value">${state.approvals.length}</div>
             <div class="kpi-subtext">Awaiting manager review</div>
           </div>
-          <div class="kpi-card" data-action="go-tips">
+          <div class="kpi-card" data-action="go-tips" role="button" tabindex="0" title="Click to view tip pool breakdown">
             <div class="kpi-card-top"><span class="kpi-label">Tip pool</span><span class="kpi-icon-wrap icon-mint">💳</span></div>
             <div class="kpi-value">${formatCurrency(calc.totalTips)}</div>
             <div class="kpi-subtext">Nov 2 &ndash; Nov 15</div>
           </div>
-          <div class="kpi-card" data-action="go-tips">
+          <div class="kpi-card" data-action="go-tips" role="button" tabindex="0" title="Click to view eligible staff">
             <div class="kpi-card-top"><span class="kpi-label">Eligible staff</span><span class="kpi-icon-wrap icon-mint">👥</span></div>
             <div class="kpi-value">${eligibleStaffCount}</div>
             <div class="kpi-subtext">With recorded pool hours</div>
@@ -858,22 +858,22 @@
         const myCashTips = userPayout ? userPayout.cashPayout : 0.00;
 
         kpiGridContainer.innerHTML = `
-          <div class="kpi-card" data-action="go-shifts">
+          <div class="kpi-card" data-action="go-claimable-shifts" role="button" tabindex="0" title="Click to view claimable shifts">
             <div class="kpi-card-top"><span class="kpi-label">Claimable shifts</span><span class="kpi-icon-wrap icon-peach">📅</span></div>
             <div class="kpi-value">${claimableShiftsCount}</div>
             <div class="kpi-subtext">Matches your certifications</div>
           </div>
-          <div class="kpi-card" data-action="go-shifts">
+          <div class="kpi-card" data-action="go-my-shifts" role="button" tabindex="0" title="Click to view your assigned shifts">
             <div class="kpi-card-top"><span class="kpi-label">My assigned shifts</span><span class="kpi-icon-wrap icon-mint">⏱️</span></div>
             <div class="kpi-value">${myAssignedShiftsCount}</div>
             <div class="kpi-subtext">On the schedule</div>
           </div>
-          <div class="kpi-card" data-action="go-approvals">
+          <div class="kpi-card" data-action="go-approvals" role="button" tabindex="0" title="Click to view open requests">
             <div class="kpi-card-top"><span class="kpi-label">My open requests</span><span class="kpi-icon-wrap icon-peach">📋</span></div>
             <div class="kpi-value">${myOpenRequestsCount}</div>
             <div class="kpi-subtext">Awaiting manager review</div>
           </div>
-          <div class="kpi-card" data-action="go-tips">
+          <div class="kpi-card" data-action="go-tips" role="button" tabindex="0" title="Click to view pooled cash tips">
             <div class="kpi-card-top"><span class="kpi-label">My pooled cash tips</span><span class="kpi-icon-wrap icon-mint">💵</span></div>
             <div class="kpi-value">${formatCurrency(myCashTips)}</div>
             <div class="kpi-subtext">${userPayout ? '1 verified shift' : '0 logged entries'}</div>
@@ -1040,7 +1040,16 @@
 
     if (!tbody || !user) return;
 
-    const filter = filterSelect ? filterSelect.value : state.employeeShiftFilter;
+    // Synchronize select dropdown with state.employeeShiftFilter
+    if (filterSelect) {
+      if (state.employeeShiftFilter) {
+        filterSelect.value = state.employeeShiftFilter;
+      } else {
+        state.employeeShiftFilter = filterSelect.value || 'all';
+      }
+    }
+
+    const filter = state.employeeShiftFilter || (filterSelect ? filterSelect.value : 'all');
 
     // Filter shifts
     let filtered = state.shifts;
@@ -1057,6 +1066,27 @@
     if (countEl) countEl.textContent = `${filtered.length} shifts shown`;
 
     tbody.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const emptyRow = document.createElement('tr');
+      let emptyMsg = 'No shifts match this filter.';
+      let emptySub = 'Try selecting another view or checking back later.';
+      if (filter === 'my-shifts') {
+        emptyMsg = 'No assigned shifts on your schedule';
+        emptySub = 'You currently have no scheduled shifts. You can claim open shifts from the Claimable shifts view.';
+      } else if (filter === 'claimable') {
+        emptyMsg = 'No claimable shifts available right now';
+        emptySub = 'All upcoming shifts matching your certifications are currently covered or pending review.';
+      }
+      emptyRow.innerHTML = `
+        <td colspan="5" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
+          <div style="font-weight: 700; color: var(--text-dark); margin-bottom: 0.25rem;">${emptyMsg}</div>
+          <div style="font-size: 0.85rem;">${emptySub}</div>
+        </td>
+      `;
+      tbody.appendChild(emptyRow);
+      return;
+    }
 
     filtered.forEach(shift => {
       const assignedUser = getUserById(shift.userId);
@@ -1968,9 +1998,16 @@
       document.getElementById('sidebar')?.classList.toggle('open');
     });
 
-    // Hero buttons
+    // Hero buttons & Quick actions
     document.addEventListener('click', (e) => {
-      if (e.target.closest('#heroReviewCoverageBtn') || e.target.closest('#heroBrowseOpenShiftsBtn') || e.target.closest('#btnViewSchedule')) {
+      if (e.target.closest('#heroReviewCoverageBtn') || e.target.closest('#btnViewSchedule')) {
+        state.employeeShiftFilter = 'all';
+        switchView('view-shifts');
+        return;
+      }
+
+      if (e.target.closest('#heroBrowseOpenShiftsBtn')) {
+        state.employeeShiftFilter = 'claimable';
         switchView('view-shifts');
         return;
       }
@@ -2007,14 +2044,20 @@
       }
     });
 
-    // KPI Card navigation
-    document.querySelectorAll('.kpi-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const action = card.getAttribute('data-action');
-        if (action === 'go-shifts') switchView('view-shifts');
-        else if (action === 'go-approvals') switchView('view-approvals');
-        else if (action === 'go-tips') switchView('view-tips');
-      });
+    // Breadcrumb navigation to Overview
+    document.querySelector('.crumb-parent')?.addEventListener('click', () => {
+      switchView('view-overview');
+    });
+
+    // Keyboard accessibility for interactive KPI cards
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const kpiCard = e.target.closest('.kpi-card');
+        if (kpiCard && (document.activeElement === kpiCard || kpiCard.contains(document.activeElement))) {
+          e.preventDefault();
+          kpiCard.click();
+        }
+      }
     });
 
     // Employee Shift Filter Dropdown (All shifts, My shifts, Claimable shifts)
@@ -2078,6 +2121,35 @@
 
     // Global Click Delegation
     document.addEventListener('click', (e) => {
+      // KPI Card Navigation
+      const kpiCard = e.target.closest('.kpi-card');
+      if (kpiCard) {
+        const action = kpiCard.getAttribute('data-action');
+        if (action === 'go-my-shifts') {
+          state.employeeShiftFilter = 'my-shifts';
+          switchView('view-shifts');
+          return;
+        }
+        if (action === 'go-claimable-shifts') {
+          state.employeeShiftFilter = 'claimable';
+          switchView('view-shifts');
+          return;
+        }
+        if (action === 'go-shifts') {
+          state.employeeShiftFilter = 'all';
+          switchView('view-shifts');
+          return;
+        }
+        if (action === 'go-approvals') {
+          switchView('view-approvals');
+          return;
+        }
+        if (action === 'go-tips') {
+          switchView('view-tips');
+          return;
+        }
+      }
+
       // Employee Claim shift
       const claimBtn = e.target.closest('[data-action="claim-shift"]');
       if (claimBtn) {

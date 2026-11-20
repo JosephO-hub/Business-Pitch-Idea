@@ -517,6 +517,12 @@ body.app-body {
 
 .crumb-parent {
   color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.crumb-parent:hover {
+  color: var(--text-dark);
 }
 
 .crumb-separator {
@@ -871,6 +877,11 @@ body.app-body {
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);
   border-color: #CBD5E1;
+}
+
+.kpi-card:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
 }
 
 .kpi-card-top {
