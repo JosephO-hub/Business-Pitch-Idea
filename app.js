@@ -1,5 +1,5 @@
 /**
- * Service Ledger — Shift & Tip Optimizer (v2.0)
+ * Restraunt Toolbox — Shift & Tip Optimizer (v2.0)
  * Juniper Kitchen Restaurant Operations System
  * Standards-compliant with /shift-tip-standards:
  * - Multi-Role Perspectives: Manager vs Employee
@@ -111,7 +111,7 @@
     'Shift Lead': 0.0 // FLSA 29 U.S.C. § 203(m)(2)(B) Locked
   };
 
-  const STORAGE_KEY = 'service_ledger_state_v4';
+  const STORAGE_KEY = 'restraunt_toolbox_state_v1';
 
   function formatDateDisplay(d) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -326,7 +326,9 @@
 
   function loadState() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || 
+                    localStorage.getItem('service_ledger_state_v4') || 
+                    localStorage.getItem('service_ledger_state_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.users && parsed.shifts && parsed.shifts.length > 0) {
@@ -1636,8 +1638,13 @@
       });
     }
 
-    // 9. Render Coverage Engine Panel if a shift is selected
-    renderSwapEnginePanel();
+    // 9. Render Coverage Engine Panel if a shift is selected (Manager Only)
+    if (!isMgr) {
+      const panel = document.getElementById('swapEnginePanel');
+      if (panel) panel.style.display = 'none';
+    } else {
+      renderSwapEnginePanel();
+    }
   }
 
   // =========================================================================
@@ -1646,6 +1653,14 @@
 
   function renderSwapEnginePanel() {
     const panel = document.getElementById('swapEnginePanel');
+    if (!panel) return;
+
+    if (!isManagerUser()) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+
     const titleEl = document.getElementById('swapTargetTitle');
     const subtitleEl = document.getElementById('swapTargetSubtitle');
     const actionContainer = document.getElementById('swapTargetActionContainer');
@@ -1910,99 +1925,270 @@
 
     const tipPoolHeading = document.getElementById('tipPoolHeading');
     const tipPoolSubheading = document.getElementById('tipPoolSubheading');
-
-    if (!isMgr) {
-      if (tipPoolHeading) tipPoolHeading.textContent = 'My Pooled Cash Tips & Earnings';
-      if (tipPoolSubheading) tipPoolSubheading.textContent = 'Transparent breakdown of your weighted tip allocation based on verified hours logged in the active schedule.';
-    } else {
-      if (tipPoolHeading) tipPoolHeading.textContent = 'Bi-Weekly Tip-Pool Allocation Engine';
-      if (tipPoolSubheading) tipPoolSubheading.textContent = 'Synchronized live with the master schedule and approved shift coverage. Enter tips and verify role multipliers for deterministic, penny-reconciled payouts.';
-    }
-
-    const cashInput = document.getElementById('inputCashTips');
-    const ccInput = document.getElementById('inputCcTips');
-    if (cashInput && document.activeElement !== cashInput) cashInput.value = state.tips.cash;
-    if (ccInput && document.activeElement !== ccInput) ccInput.value = state.tips.cc;
-
-    const totalDisplay = document.getElementById('displayTotalTipPool');
-    const miniCash = document.getElementById('miniCash');
-    const miniCc = document.getElementById('miniCc');
-
-    if (totalDisplay) totalDisplay.textContent = formatCurrency(calc.totalTips);
-    if (miniCash) miniCash.textContent = formatCurrency(calc.cashTips);
-    if (miniCc) miniCc.textContent = formatCurrency(calc.ccTips);
-
-    const reconStatus = document.getElementById('reconciliationStatus');
-    if (reconStatus) {
-      if (Math.abs(calc.reconciliationDiff) < 0.001) {
-        reconStatus.innerHTML = `<span class="dot green"></span> Exact Cent Balanced: $0.00 Penny Remainder`;
-      } else {
-        reconStatus.innerHTML = `<span class="dot amber"></span> Variance: ${formatCurrency(calc.reconciliationDiff)}`;
-      }
-    }
-
+    const tipInputsRow = document.getElementById('tipInputsRow');
+    const managerTipReceiptsBox = document.getElementById('managerTipReceiptsBox');
+    const managerRoleWeightsBox = document.getElementById('managerRoleWeightsBox');
+    const employeeTipBanner = document.getElementById('employeeTipBanner');
+    const tipFormulaStrip = document.getElementById('tipFormulaStrip');
+    const cardTitle = document.getElementById('tipPayoutCardTitle');
+    const cardSub = document.getElementById('tipPayoutCardSub');
+    const syncBadge = document.getElementById('tipPayoutSyncBadge');
+    const btnPrintReceipt = document.getElementById('btnPrintReceiptBtn');
+    const btnCopySummary = document.getElementById('btnCopySummaryBtn');
     const tbody = document.getElementById('tipPayoutTableBody');
     const tfoot = document.getElementById('tipPayoutTableFoot');
-    if (!tbody || !tfoot) return;
 
-    tbody.innerHTML = '';
+    if (!isMgr) {
+      // 1. Employee Header & Descriptions
+      if (tipPoolHeading) tipPoolHeading.textContent = 'My Pooled Cash Tips & Earnings';
+      if (tipPoolSubheading) tipPoolSubheading.textContent = 'Transparent breakdown of your personal weighted tip allocation based on verified hours logged in the active schedule.';
 
-    let sumCash = 0;
-    let sumCc = 0;
-    let sumTotal = 0;
+      // 2. Hide Manager-Only Input Controls & Weight Multipliers
+      if (tipInputsRow) tipInputsRow.style.display = 'none';
+      if (managerTipReceiptsBox) managerTipReceiptsBox.style.display = 'none';
+      if (managerRoleWeightsBox) managerRoleWeightsBox.style.display = 'none';
 
-    calc.crew.forEach(item => {
-      sumCash += item.cashPayout;
-      sumCc += item.ccPayout;
-      sumTotal += item.totalPayout;
+      // 3. Hide Deterministic Validation Engine / Formula Strip from Employees
+      if (tipFormulaStrip) tipFormulaStrip.style.display = 'none';
 
-      const isZero = item.weight === 0;
-      const isCurrent = user && user.id === item.user.id;
+      // 4. Show Employee Personal Summary Card
+      if (employeeTipBanner) employeeTipBanner.style.display = 'block';
 
-      const tr = document.createElement('tr');
-      if (isCurrent && !isMgr) {
-        tr.style.background = '#F0FDF4';
+      const myItem = calc.crew.find(c => c.user.id === user?.id);
+      const empName = document.getElementById('employeeTipCardName');
+      const empTotal = document.getElementById('employeeTipTotalBadge');
+      const empHours = document.getElementById('employeeTipHoursWorked');
+      const empRole = document.getElementById('employeeTipRoleBadge');
+      const empCash = document.getElementById('employeeTipCashShare');
+      const empCc = document.getElementById('employeeTipCcShare');
+      const empSharePct = document.getElementById('employeeTipSharePct');
+      const empWeight = document.getElementById('employeeTipWeightBadge');
+
+      if (myItem) {
+        if (empName) empName.textContent = `${user.name}'s Personal Tip Allocation`;
+        if (empTotal) empTotal.textContent = formatCurrency(myItem.totalPayout);
+        if (empHours) empHours.textContent = `${myItem.hoursWorked.toFixed(1)} hrs`;
+        if (empRole) empRole.textContent = `Station: ${myItem.role}`;
+        if (empCash) empCash.textContent = formatCurrency(myItem.cashPayout);
+        if (empCc) empCc.textContent = formatCurrency(myItem.ccPayout);
+        if (empSharePct) empSharePct.textContent = `${myItem.poolSharePercent.toFixed(1)}%`;
+        if (empWeight) empWeight.textContent = `Weight Multiplier: ${myItem.weight.toFixed(1)}x`;
+      } else {
+        if (empName) empName.textContent = `${user?.name || 'Staff'}'s Personal Tip Allocation`;
+        if (empTotal) empTotal.textContent = '$0.00';
+        if (empHours) empHours.textContent = '0.0 hrs';
+        if (empRole) empRole.textContent = 'No floor hours scheduled';
+        if (empCash) empCash.textContent = '$0.00';
+        if (empCc) empCc.textContent = '$0.00';
+        if (empSharePct) empSharePct.textContent = '0.0%';
+        if (empWeight) empWeight.textContent = 'Standard Share';
       }
 
-      tr.innerHTML = `
-        <td>
-          <div class="td-main-bold">${item.user.name} ${isCurrent ? '<span style="color:#059669;font-weight:700;">(You)</span>' : ''}</div>
-          ${item.user.role !== 'Employee' ? `<span class="manager-badge" style="font-size:0.65rem;">FLSA Excluded (${item.user.role})</span>` : ''}
-        </td>
-        <td>
-          <span class="role-badge ${item.role.toLowerCase().replace(/\s+/g, '')}">${item.role}</span>
-        </td>
-        <td class="num-col">
-          <strong>${item.hoursWorked.toFixed(1)} hrs</strong>
-        </td>
-        <td class="num-col" style="${isZero ? 'color:#9CA3AF;' : ''}">${item.weight.toFixed(1)}x</td>
-        <td class="num-col" style="${isZero ? 'color:#9CA3AF;' : ''}">${item.weightedHours.toFixed(2)}</td>
-        <td class="num-col" style="${isZero ? 'color:#9CA3AF;' : ''}">${item.poolSharePercent.toFixed(1)}%</td>
-        <td class="num-col" style="color:#059669; font-weight:700;">${formatCurrency(item.cashPayout)}</td>
-        <td class="num-col" style="color:#0284C7; font-weight:700;">${formatCurrency(item.ccPayout)}</td>
-        <td class="num-col highlight-cell">${formatCurrency(item.totalPayout)}</td>
-      `;
+      // 5. Card Header Titles (Employee Perspective)
+      if (cardTitle) cardTitle.textContent = 'Your Personal Tip Allocation Breakdown';
+      if (cardSub) cardSub.textContent = 'Personal verified earnings based on your scheduled hours on the floor.';
+      if (syncBadge) syncBadge.innerHTML = '<span class="sync-dot"></span> Personal Allocation Verified';
 
-      tbody.appendChild(tr);
-    });
+      // 6. Protect Privacy in Payout Breakdown: NEVER leak coworkers' names, hours, or payouts!
+      if (tbody && tfoot) {
+        tbody.innerHTML = '';
+        if (myItem) {
+          const tr = document.createElement('tr');
+          tr.style.background = '#F0FDF4';
+          tr.innerHTML = `
+            <td>
+              <div class="td-main-bold">${myItem.user.name} <span style="color:#059669;font-weight:700;">(You)</span></div>
+              <span style="font-size:0.75rem; color:var(--text-muted);">Verified Scheduled Floor Hours</span>
+            </td>
+            <td>
+              <span class="role-badge ${myItem.role.toLowerCase().replace(/\s+/g, '')}">${myItem.role}</span>
+            </td>
+            <td class="num-col">
+              <strong>${myItem.hoursWorked.toFixed(1)} hrs</strong>
+            </td>
+            <td class="num-col">${myItem.weight.toFixed(1)}x</td>
+            <td class="num-col">${myItem.weightedHours.toFixed(2)}</td>
+            <td class="num-col">${myItem.poolSharePercent.toFixed(1)}%</td>
+            <td class="num-col" style="color:#059669; font-weight:700;">${formatCurrency(myItem.cashPayout)}</td>
+            <td class="num-col" style="color:#0284C7; font-weight:700;">${formatCurrency(myItem.ccPayout)}</td>
+            <td class="num-col highlight-cell">${formatCurrency(myItem.totalPayout)}</td>
+          `;
+          tbody.appendChild(tr);
 
-    tfoot.innerHTML = `
-      <tr>
-        <td colspan="2"><strong>TOTAL SCHEDULED POOL</strong></td>
-        <td class="num-col"><strong>${calc.totalWorkingHours.toFixed(1)} hrs</strong></td>
-        <td class="num-col">&mdash;</td>
-        <td class="num-col"><strong>${calc.totalWeightedHours.toFixed(2)} pts</strong></td>
-        <td class="num-col"><strong>100.0%</strong></td>
-        <td class="num-col" style="color:#059669; font-weight:800;">${formatCurrency(sumCash)}</td>
-        <td class="num-col" style="color:#0284C7; font-weight:800;">${formatCurrency(sumCc)}</td>
-        <td class="num-col highlight-cell" style="font-size:1rem;">${formatCurrency(sumTotal)}</td>
-      </tr>
-    `;
+          tfoot.innerHTML = `
+            <tr>
+              <td colspan="2"><strong>YOUR PAYOUT SUMMARY</strong></td>
+              <td class="num-col"><strong>${myItem.hoursWorked.toFixed(1)} hrs</strong></td>
+              <td class="num-col">&mdash;</td>
+              <td class="num-col"><strong>${myItem.weightedHours.toFixed(2)} pts</strong></td>
+              <td class="num-col"><strong>${myItem.poolSharePercent.toFixed(1)}%</strong></td>
+              <td class="num-col" style="color:#059669; font-weight:800;">${formatCurrency(myItem.cashPayout)}</td>
+              <td class="num-col" style="color:#0284C7; font-weight:800;">${formatCurrency(myItem.ccPayout)}</td>
+              <td class="num-col highlight-cell" style="font-size:1rem;">${formatCurrency(myItem.totalPayout)}</td>
+            </tr>
+          `;
+        } else {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">📋</div>
+                <strong>No Active Floor Shifts in Current Period</strong>
+                <p style="font-size: 0.85rem; margin-top: 0.25rem;">You do not have any scheduled floor hours in this period. Once shifts are logged and completed, your personal tip share will appear here.</p>
+              </td>
+            </tr>
+          `;
+          tfoot.innerHTML = '';
+        }
+      }
+
+      // 7. Update Action Buttons
+      if (btnPrintReceipt) {
+        btnPrintReceipt.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          <span>Print My Tip Slip</span>
+        `;
+      }
+      if (btnCopySummary) {
+        btnCopySummary.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy My Breakdown</span>
+        `;
+      }
+
+    } else {
+      // Manager Perspective
+      if (tipPoolHeading) tipPoolHeading.textContent = 'Bi-Weekly Tip-Pool Allocation Engine';
+      if (tipPoolSubheading) tipPoolSubheading.textContent = 'Synchronized live with the master schedule and approved shift coverage. Enter tips and verify role multipliers for deterministic, penny-reconciled payouts.';
+
+      // Show Manager Input Controls & Multipliers
+      if (tipInputsRow) tipInputsRow.style.display = 'grid';
+      if (managerTipReceiptsBox) managerTipReceiptsBox.style.display = 'block';
+      if (managerRoleWeightsBox) managerRoleWeightsBox.style.display = 'block';
+
+      // Show Deterministic Validation Engine / Formula Strip for Managers
+      if (tipFormulaStrip) tipFormulaStrip.style.display = 'flex';
+
+      // Hide Employee Personal Summary Card
+      if (employeeTipBanner) employeeTipBanner.style.display = 'none';
+
+      // Populate Manager Input Fields
+      const cashInput = document.getElementById('inputCashTips');
+      const ccInput = document.getElementById('inputCcTips');
+      if (cashInput && document.activeElement !== cashInput) cashInput.value = state.tips.cash;
+      if (ccInput && document.activeElement !== ccInput) ccInput.value = state.tips.cc;
+
+      const totalDisplay = document.getElementById('displayTotalTipPool');
+      const miniCash = document.getElementById('miniCash');
+      const miniCc = document.getElementById('miniCc');
+
+      if (totalDisplay) totalDisplay.textContent = formatCurrency(calc.totalTips);
+      if (miniCash) miniCash.textContent = formatCurrency(calc.cashTips);
+      if (miniCc) miniCc.textContent = formatCurrency(calc.ccTips);
+
+      const reconStatus = document.getElementById('reconciliationStatus');
+      if (reconStatus) {
+        if (Math.abs(calc.reconciliationDiff) < 0.001) {
+          reconStatus.innerHTML = `<span class="dot green"></span> Exact Cent Balanced: $0.00 Penny Remainder`;
+        } else {
+          reconStatus.innerHTML = `<span class="dot amber"></span> Variance: ${formatCurrency(calc.reconciliationDiff)}`;
+        }
+      }
+
+      // Card Header Titles (Manager Perspective)
+      if (cardTitle) cardTitle.textContent = "Tonight's Working Crew Payout Breakdown";
+      if (cardSub) cardSub.textContent = "Hours pulled live from tonight's shift roster. You may adjust hours worked if an employee clocked in/out early.";
+      if (syncBadge) syncBadge.innerHTML = '<span class="sync-dot"></span> Synced with Tonight\'s Floor';
+
+      // Full Working Crew Payout Breakdown Table for Managers
+      if (tbody && tfoot) {
+        tbody.innerHTML = '';
+        let sumCash = 0;
+        let sumCc = 0;
+        let sumTotal = 0;
+
+        calc.crew.forEach(item => {
+          sumCash += item.cashPayout;
+          sumCc += item.ccPayout;
+          sumTotal += item.totalPayout;
+
+          const isZero = item.weight === 0;
+          const isCurrent = user && user.id === item.user.id;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <div class="td-main-bold">${item.user.name} ${isCurrent ? '<span style="color:#059669;font-weight:700;">(You)</span>' : ''}</div>
+              ${item.user.role !== 'Employee' ? `<span class="manager-badge" style="font-size:0.65rem;">FLSA Excluded (${item.user.role})</span>` : ''}
+            </td>
+            <td>
+              <span class="role-badge ${item.role.toLowerCase().replace(/\s+/g, '')}">${item.role}</span>
+            </td>
+            <td class="num-col">
+              <strong>${item.hoursWorked.toFixed(1)} hrs</strong>
+            </td>
+            <td class="num-col" style="${isZero ? 'color:#9CA3AF;' : ''}">${item.weight.toFixed(1)}x</td>
+            <td class="num-col" style="${isZero ? 'color:#9CA3AF;' : ''}">${item.weightedHours.toFixed(2)}</td>
+            <td class="num-col" style="${isZero ? 'color:#9CA3AF;' : ''}">${item.poolSharePercent.toFixed(1)}%</td>
+            <td class="num-col" style="color:#059669; font-weight:700;">${formatCurrency(item.cashPayout)}</td>
+            <td class="num-col" style="color:#0284C7; font-weight:700;">${formatCurrency(item.ccPayout)}</td>
+            <td class="num-col highlight-cell">${formatCurrency(item.totalPayout)}</td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+
+        tfoot.innerHTML = `
+          <tr>
+            <td colspan="2"><strong>TOTAL SCHEDULED POOL</strong></td>
+            <td class="num-col"><strong>${calc.totalWorkingHours.toFixed(1)} hrs</strong></td>
+            <td class="num-col">&mdash;</td>
+            <td class="num-col"><strong>${calc.totalWeightedHours.toFixed(2)} pts</strong></td>
+            <td class="num-col"><strong>100.0%</strong></td>
+            <td class="num-col" style="color:#059669; font-weight:800;">${formatCurrency(sumCash)}</td>
+            <td class="num-col" style="color:#0284C7; font-weight:800;">${formatCurrency(sumCc)}</td>
+            <td class="num-col highlight-cell" style="font-size:1rem;">${formatCurrency(sumTotal)}</td>
+          </tr>
+        `;
+      }
+
+      // Manager Action Buttons
+      if (btnPrintReceipt) {
+        btnPrintReceipt.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          <span>Print Shift &amp; Tip Slip</span>
+        `;
+      }
+      if (btnCopySummary) {
+        btnCopySummary.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy Summary</span>
+        `;
+      }
+    }
   }
 
   function renderRoleWeightSliders() {
     const container = document.getElementById('roleWeightsList');
     if (!container) return;
+
+    if (!isManagerUser()) {
+      container.innerHTML = '';
+      return;
+    }
 
     container.innerHTML = '';
     const roles = ['Bartender', 'Server', 'Host', 'Busser', 'Line cook', 'Shift Lead'];
@@ -2010,7 +2196,6 @@
     roles.forEach(role => {
       const weight = state.roleWeights[role] !== undefined ? state.roleWeights[role] : 1.0;
       const isShiftLead = role === 'Shift Lead';
-      const isMgr = isManagerUser();
 
       const row = document.createElement('div');
       row.className = 'weight-row';
@@ -2029,7 +2214,7 @@
                  step="0.1" 
                  value="${weight}" 
                  data-role="${role}" 
-                 ${(isShiftLead || !isMgr) ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+                 ${isShiftLead ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
           <span class="weight-val-badge">${weight.toFixed(1)}x</span>
         </div>
       `;
@@ -2167,6 +2352,9 @@
 
   function renderReceiptModal() {
     const calc = calculateTipPool();
+    const isMgr = isManagerUser();
+    const user = getCurrentUser();
+
     const slipTotalPool = document.getElementById('slipTotalPool');
     const slipCashTips = document.getElementById('slipCashTips');
     const slipCcTips = document.getElementById('slipCcTips');
@@ -2177,15 +2365,52 @@
     const slipTimestamp = document.getElementById('slipTimestamp');
     const slipReconciliation = document.getElementById('slipReconciliation');
 
+    const now = new Date();
+    if (slipDate) slipDate.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (slipTimestamp) slipTimestamp.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    if (!isMgr) {
+      // Employee Individual Receipt View
+      const myItem = calc.crew.find(c => c.user.id === user?.id);
+      if (slipTotalPool) slipTotalPool.textContent = formatCurrency(myItem ? myItem.totalPayout : 0);
+      if (slipCashTips) slipCashTips.textContent = formatCurrency(myItem ? myItem.cashPayout : 0);
+      if (slipCcTips) slipCcTips.textContent = formatCurrency(myItem ? myItem.ccPayout : 0);
+      if (slipTotalHours) slipTotalHours.textContent = `${(myItem ? myItem.hoursWorked : 0).toFixed(1)} hrs`;
+      if (slipTotalWeighted) slipTotalWeighted.textContent = `${(myItem ? myItem.weightedHours : 0).toFixed(2)} pts`;
+
+      if (slipReconciliation) {
+        slipReconciliation.textContent = 'Personal Allocation Verified (FLSA Compliant)';
+      }
+
+      if (slipCrewList) {
+        slipCrewList.innerHTML = '';
+        if (myItem) {
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'slip-item';
+          itemDiv.innerHTML = `
+            <div class="slip-item-top">
+              <span>${myItem.user.name} (${myItem.role})</span>
+              <span>${formatCurrency(myItem.totalPayout)}</span>
+            </div>
+            <div class="slip-item-sub">
+              <span>${myItem.hoursWorked}h × ${myItem.weight.toFixed(1)}w = ${myItem.weightedHours.toFixed(1)} pts (${myItem.poolSharePercent.toFixed(1)}%)</span>
+              <span>Cash: ${formatCurrency(myItem.cashPayout)} | CC: ${formatCurrency(myItem.ccPayout)}</span>
+            </div>
+          `;
+          slipCrewList.appendChild(itemDiv);
+        } else {
+          slipCrewList.innerHTML = '<div style="padding:1rem 0; color:#6B7280; text-align:center;">No floor shifts logged for this period.</div>';
+        }
+      }
+      return;
+    }
+
+    // Manager Full Shift Roster View
     if (slipTotalPool) slipTotalPool.textContent = formatCurrency(calc.totalTips);
     if (slipCashTips) slipCashTips.textContent = formatCurrency(calc.cashTips);
     if (slipCcTips) slipCcTips.textContent = formatCurrency(calc.ccTips);
     if (slipTotalHours) slipTotalHours.textContent = `${calc.totalWorkingHours.toFixed(1)} hrs`;
     if (slipTotalWeighted) slipTotalWeighted.textContent = `${calc.totalWeightedHours.toFixed(2)} pts`;
-
-    const now = new Date();
-    if (slipDate) slipDate.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if (slipTimestamp) slipTimestamp.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     if (slipReconciliation) {
       slipReconciliation.textContent = `100.0% Exact Match (${formatCurrency(calc.reconciliationDiff)} var)`;
@@ -2720,6 +2945,7 @@
       // Manager Validate shift
       const valBtn = e.target.closest('[data-action="validate-shift"]');
       if (valBtn) {
+        if (!isManagerUser()) return;
         const shiftId = valBtn.getAttribute('data-shift-id');
         state.selectedShiftId = state.selectedShiftId === shiftId ? null : shiftId;
         renderShiftBoardView();
@@ -2729,6 +2955,7 @@
       // Manager Edit shift
       const editShiftBtn = e.target.closest('[data-action="edit-shift"]');
       if (editShiftBtn) {
+        if (!isManagerUser()) return;
         const shiftId = editShiftBtn.getAttribute('data-shift-id');
         openShiftEditModal(shiftId);
         return;
@@ -2737,6 +2964,7 @@
       // Manager Delete shift
       const delShiftBtn = e.target.closest('[data-action="delete-shift"]');
       if (delShiftBtn) {
+        if (!isManagerUser()) return;
         const shiftId = delShiftBtn.getAttribute('data-shift-id');
         handleDeleteShift(shiftId);
         return;
@@ -2745,6 +2973,7 @@
       // Manager Approve swap from engine
       const approveSwapBtn = e.target.closest('[data-action="approve-swap"]');
       if (approveSwapBtn) {
+        if (!isManagerUser()) return;
         const candId = approveSwapBtn.getAttribute('data-cand-id');
         const shiftId = approveSwapBtn.getAttribute('data-shift-id');
         const shift = getShiftById(shiftId);
@@ -2865,8 +3094,9 @@
       }
     });
 
-    // Tip Pool Inputs
+    // Tip Pool Inputs (Manager Only)
     document.getElementById('inputCashTips')?.addEventListener('input', (e) => {
+      if (!isManagerUser()) return;
       state.tips.cash = parseFloat(e.target.value) || 0;
       saveState();
       renderTipCalculator();
@@ -2874,6 +3104,7 @@
     });
 
     document.getElementById('inputCcTips')?.addEventListener('input', (e) => {
+      if (!isManagerUser()) return;
       state.tips.cc = parseFloat(e.target.value) || 0;
       saveState();
       renderTipCalculator();
@@ -2881,6 +3112,7 @@
     });
 
     document.getElementById('btnResetWeights')?.addEventListener('click', () => {
+      if (!isManagerUser()) return;
       state.roleWeights = JSON.parse(JSON.stringify(DEFAULT_WEIGHTS));
       saveState();
       renderRoleWeightSliders();
@@ -2889,6 +3121,7 @@
     });
 
     document.getElementById('roleWeightsList')?.addEventListener('input', (e) => {
+      if (!isManagerUser()) return;
       if (e.target.classList.contains('range-slider')) {
         const role = e.target.getAttribute('data-role');
         const val = parseFloat(e.target.value);
@@ -2937,13 +3170,33 @@
 
     document.getElementById('btnCopySummaryBtn')?.addEventListener('click', () => {
       const calc = calculateTipPool();
-      let text = `✦ JUNIPER KITCHEN • TIP POOL SUMMARY ✦\n`;
-      text += `Total Pool: ${formatCurrency(calc.totalTips)} (Cash: ${formatCurrency(calc.cashTips)} | CC: ${formatCurrency(calc.ccTips)})\n`;
-      calc.crew.forEach(c => {
-        text += `• ${c.user.name} (${c.role}): Total ${formatCurrency(c.totalPayout)} (Cash ${formatCurrency(c.cashPayout)}, CC ${formatCurrency(c.ccPayout)})\n`;
-      });
+      const isMgr = isManagerUser();
+      const user = getCurrentUser();
+      let text = '';
+
+      if (isMgr) {
+        text = `✦ RESTRAUNT TOOLBOX • TIP POOL SUMMARY ✦\n`;
+        text += `Total Pool: ${formatCurrency(calc.totalTips)} (Cash: ${formatCurrency(calc.cashTips)} | CC: ${formatCurrency(calc.ccTips)})\n`;
+        calc.crew.forEach(c => {
+          text += `• ${c.user.name} (${c.role}): Total ${formatCurrency(c.totalPayout)} (Cash ${formatCurrency(c.cashPayout)}, CC ${formatCurrency(c.ccPayout)})\n`;
+        });
+      } else {
+        const myItem = calc.crew.find(c => c.user.id === user?.id);
+        text = `✦ RESTRAUNT TOOLBOX • PERSONAL TIP BREAKDOWN ✦\n`;
+        text += `Team Member: ${user?.name || 'Staff'}\n`;
+        if (myItem) {
+          text += `Shift Role: ${myItem.role}\n`;
+          text += `Hours Logged: ${myItem.hoursWorked.toFixed(1)} hrs\n`;
+          text += `Take-Home Cash: ${formatCurrency(myItem.cashPayout)}\n`;
+          text += `Credit Card Share (Payroll): ${formatCurrency(myItem.ccPayout)}\n`;
+          text += `Total Tip Payout: ${formatCurrency(myItem.totalPayout)}\n`;
+        } else {
+          text += `No scheduled floor shift hours in current pool.\n`;
+        }
+      }
+
       navigator.clipboard.writeText(text).then(() => {
-        showToast('Tip distribution summary copied to clipboard!', 'success');
+        showToast(isMgr ? 'Tip distribution summary copied to clipboard!' : 'Personal tip breakdown copied to clipboard!', 'success');
       }).catch(() => {
         showToast('Could not access clipboard.', 'warning');
       });

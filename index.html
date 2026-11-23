@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Service Ledger | Shift &amp; Tip Optimizer</title>
+  <title>Restraunt Toolbox | Shift &amp; Tip Optimizer</title>
   <meta name="description" content="Find qualified coverage, approve shift changes, and reconcile every cent of the tip pool.">
   <!-- Apricot Logo Favicon -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23F59A65'%3E%3Crect width='24' height='24' rx='6' fill='%23F59A65'/%3E%3Cpath d='M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z' stroke='%23113228' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -31,7 +31,7 @@
         </svg>
       </div>
 
-      <h1 class="pin-title">Service Ledger</h1>
+      <h1 class="pin-title">Restraunt Toolbox</h1>
       <p class="pin-subtitle">Enter your unique 4-digit PIN to access your workspace. Your role will be recognized automatically.</p>
 
       <form id="pinLoginForm" class="pin-form" autocomplete="off">
@@ -99,7 +99,7 @@
             </svg>
           </div>
           <div class="brand-text">
-            <div class="brand-name">Service Ledger</div>
+            <div class="brand-name">Restraunt Toolbox</div>
             <div class="brand-tag">SHIFT &amp; TIP OPTIMIZER</div>
           </div>
         </div>
@@ -394,8 +394,9 @@
             </div>
           </div>
 
+          <!-- Manager Tip Input Controls (Hidden for non-Manager Employees) -->
           <div class="tip-inputs-row" id="tipInputsRow">
-            <div class="tip-box">
+            <div class="tip-box" id="managerTipReceiptsBox">
               <h3 class="box-title">1. Enter Shift Tip Receipts</h3>
               <div class="input-group-grid">
                 <div class="form-group">
@@ -435,7 +436,7 @@
               </div>
             </div>
 
-            <div class="tip-box">
+            <div class="tip-box" id="managerRoleWeightsBox">
               <div class="box-title-row">
                 <h3 class="box-title">2. Role Weight Multipliers</h3>
                 <button id="btnResetWeights" class="btn-link">Reset Weights</button>
@@ -449,6 +450,45 @@
                 <div class="callout-text">
                   <strong>FLSA Labor Standard Guardrail:</strong>
                   <span>Under 29 U.S.C. § 203(m)(2)(B), Shift Leads and Managers are strictly excluded from tip-pool payouts. Shift Lead weight is locked to 0.0x.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Employee Personal Tip Overview (Shown ONLY for non-Manager Employees) -->
+          <div class="employee-tip-banner" id="employeeTipBanner" style="display: none;">
+            <div class="employee-tip-card">
+              <div class="employee-tip-header">
+                <div>
+                  <span class="sub-badge" style="background:#DCFCE7; color:#166534; font-weight:700;">YOUR SHIFT EARNINGS</span>
+                  <h3 class="employee-tip-name" id="employeeTipCardName">My Personal Tip Allocation</h3>
+                  <p class="employee-tip-desc" id="employeeTipCardDesc">Transparent, deterministic tip calculation based on your hours worked on the floor.</p>
+                </div>
+                <div class="employee-tip-payout-badge">
+                  <span class="badge-label">TOTAL ESTIMATED TIP PAYOUT</span>
+                  <div class="badge-value" id="employeeTipTotalBadge">$0.00</div>
+                </div>
+              </div>
+              <div class="employee-tip-metrics-grid">
+                <div class="emp-metric-card">
+                  <span class="emp-metric-label">HOURS WORKED</span>
+                  <div class="emp-metric-value" id="employeeTipHoursWorked">0.0 hrs</div>
+                  <span class="emp-metric-sub" id="employeeTipRoleBadge">Station: Server</span>
+                </div>
+                <div class="emp-metric-card">
+                  <span class="emp-metric-label">TAKE-HOME CASH SHARE</span>
+                  <div class="emp-metric-value text-green" id="employeeTipCashShare">$0.00</div>
+                  <span class="emp-metric-sub">Distributed at shift close</span>
+                </div>
+                <div class="emp-metric-card">
+                  <span class="emp-metric-label">CREDIT CARD SHARE (PAYROLL)</span>
+                  <div class="emp-metric-value text-blue" id="employeeTipCcShare">$0.00</div>
+                  <span class="emp-metric-sub">Processed on payroll</span>
+                </div>
+                <div class="emp-metric-card">
+                  <span class="emp-metric-label">WEIGHTED POOL SHARE</span>
+                  <div class="emp-metric-value" id="employeeTipSharePct">0.0%</div>
+                  <span class="emp-metric-sub" id="employeeTipWeightBadge">Weight Multiplier: 1.0x</span>
                 </div>
               </div>
             </div>
@@ -468,10 +508,10 @@
           <div class="content-card">
             <div class="content-card-header">
               <div>
-                <h3 class="card-main-title">Tonight's Working Crew Payout Breakdown</h3>
-                <p class="card-main-sub">Hours pulled live from tonight's shift roster. You may adjust hours worked if an employee clocked in/out early.</p>
+                <h3 class="card-main-title" id="tipPayoutCardTitle">Tonight's Working Crew Payout Breakdown</h3>
+                <p class="card-main-sub" id="tipPayoutCardSub">Hours pulled live from tonight's shift roster. You may adjust hours worked if an employee clocked in/out early.</p>
               </div>
-              <div class="sync-badge">
+              <div class="sync-badge" id="tipPayoutSyncBadge">
                 <span class="sync-dot"></span> Synced with Tonight's Floor
               </div>
             </div>
@@ -1032,7 +1072,7 @@
           </div>
 
           <div class="slip-footer">
-            Printed from Service Ledger &bull; Shift &amp; Tip Optimizer<br>
+            Printed from Restraunt Toolbox &bull; Shift &amp; Tip Optimizer<br>
             Tamper-proof deterministic calculation record.
           </div>
         </div>

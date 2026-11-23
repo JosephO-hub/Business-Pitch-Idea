@@ -1,6 +1,6 @@
-# Service Ledger — Shift & Tip Optimizer (v2.0)
+# Restraunt Toolbox — Shift & Tip Optimizer (v2.0)
 
-A modern, hospitality-first web application for restaurant shift leads, managers, and staff. Built with the **Juniper Kitchen / Service Ledger** design system: deep forest green (`#143C33`), warm peach accents (`#F59A65`), PIN-based multi-role authentication, **Manager-Only Schedule Builder (Bi-Weekly & Monthly Generator)**, and role-adaptive perspectives for employees and managers.
+A modern, hospitality-first web application for restaurant shift leads, managers, and staff. Built with the **Juniper Kitchen / Restraunt Toolbox** design system: deep forest green (`#143C33`), warm peach accents (`#F59A65`), PIN-based multi-role authentication, **Manager-Only Schedule Builder (Bi-Weekly & Monthly Generator)**, and role-adaptive perspectives for employees and managers.
 
 Built in strict compliance with the [`shift-tip-standards`](.agents/skills/shift-tip-standards/SKILL.md) design, technical, and calculation standards.
 
@@ -26,6 +26,9 @@ Employees sign in with their unique 4-digit PIN (e.g., Jordan Ellis: `2222`, Jos
 - **My Requests:**
   - Tracks all pending claims and trade proposals with live status: `Awaiting manager review`.
   - Allows withdrawing pending requests before review.
+- **Personal Cash Tips & Payout Privacy:**
+  - **Restricted Manager Panels:** "Enter Shift Tip Receipts" and "Role Weight Multipliers" are strictly hidden from employees.
+  - **Privacy-Guarded Breakdown:** Non-manager employees see only their personal earnings breakdown (hours, role, cash share, payroll credit card share, and total payout). Coworkers' names, hours, and tip amounts are completely hidden.
 
 ### 💼 The Manager Perspective & Schedule Builder
 Managers sign in with manager credentials (e.g., Ava Morgan: `5678` or Paul Parajuli: `1234`) to access management controls:
@@ -44,12 +47,29 @@ Managers sign in with manager credentials (e.g., Ava Morgan: `5678` or Paul Para
     - Instantly recalculates shift hours and tip-pool shares to the exact cent.
 - **Coverage Validation Engine:**
   - Click **"Validate"** on any scheduled shift to evaluate off-duty employees against station certifications and straight-time wage policies.
+- **Bi-Weekly Tip-Pool Allocation Engine:**
+  - Full receipt entry (Cash Tips and Credit Card Tips).
+  - Role weight multipliers with sliders and standards reset.
+  - Deterministic mathematical formula breakdown and penny reconciliation badge ($0.00 variance).
+  - Complete working crew payout breakdown table and master shift receipt slip generation.
 - **Audit Log & Labor Compliance:**
   - Verified audit trail logging all schedule publications, approved shift coverage transfers, and wage policy checks.
 
 ---
 
-## ⚡ 2. Real-Time Sync & Calculation Model
+## 🛡️ 2. Role-Based Visibility & Access Control Guardrails
+
+Restraunt Toolbox enforces strict client-side role-based access control and coworker privacy:
+
+1. **Hidden Shift Tip Receipts:** Non-manager employees cannot view or edit Cash Tips, Credit Card Tips, or receipt totals on the Shift Board or Tip Pool page.
+2. **Hidden Role Weight Multipliers:** Non-manager employees cannot view, adjust, or reset role weights. The calculation engine applies saved weights from `localStorage` seamlessly in the background.
+3. **Hidden Coverage Validation Engine:** The Deterministic Validation Engine on the Master Schedule and Tip Pool formula strip are hidden from employees. Only managers can evaluate replacement candidates or inspect internal diagnostics.
+4. **Coworker Privacy in Tip Breakdowns:** Employees only see their own individual payout row and summary (hours, role, cash share, CC payroll share, total tip payout). Coworker names, hours, and tip shares are never rendered in the employee DOM.
+5. **State Guardrails:** Action handlers (tip inputs, slider inputs, weight reset, shift validation, shift edit, delete, and reassignment) verify `isManagerUser()` before making any state mutations.
+
+---
+
+## ⚡ 3. Real-Time Sync & Calculation Model
 
 - **Standard Straight-Time Wage Policy:** Straight-time hourly rates apply to all shift hours (zero 1.5x overtime rate adjustments or threshold penalties).
 - **Tip Pool Split Sync:** Tip-pool shares dynamically pull employee hours worked from the unified schedule. Reassigning a shift via swap authorization immediately recalculates team members' hours and tip distributions down to the exact penny ($0.00 remainder variance via the Largest Remainder Method).
@@ -57,10 +77,10 @@ Managers sign in with manager credentials (e.g., Ava Morgan: `5678` or Paul Para
 
 ---
 
-## 🔐 3. PIN-Based Multi-Role Authentication
+## 🔐 4. PIN-Based Multi-Role Authentication
 
 - **Full-height Deep Forest Green Screen (`#143C33`):**
-  - 72px apricot squircle logo (`#F59A65`) above the "Service Ledger" heading.
+  - 72px apricot squircle logo (`#F59A65`) above the "Restraunt Toolbox" heading.
   - Masked four-digit PIN input with automatic user and role recognition.
   - Quick-fill demo login chips:
     - 👤 **Employee:** `2222` (*Jordan Ellis — JE*)
@@ -71,31 +91,7 @@ Managers sign in with manager credentials (e.g., Ava Morgan: `5678` or Paul Para
 
 ---
 
-## 🚀 4. GitHub Pages Deployment
-
-1. Push this repository to GitHub.
-2. In GitHub, go to **Settings** > **Pages**.
-3. Under **Branch**, select `main` (or `master`) and `/ (root)`.
-4. Click **Save**. Your site will be live within seconds.
-
----
-
-## 🔐 2. PIN-Based Multi-Role Authentication
-
-- **Full-height Deep Forest Green Screen (`#143C33`):**
-  - 72px apricot fork-and-receipt squircle logo (`#F59A65`) above the "Service Ledger" heading.
-  - Masked four-digit PIN input with automatic user and role recognition.
-  - Green **"Sign in"** button.
-  - Quick-fill demo login chips:
-    - 👤 **Employee:** `2222` (*Jordan Ellis — JE*)
-    - 👤 **Employee:** `6666` (*Joseph — JO*)
-    - 💼 **Manager:** `5678` (*Ava Morgan — AM*)
-    - 👑 **Admin:** `1234` (*Paul Parajuli — PP*)
-  - **"Sign out"** button in top bar securely locks the workspace.
-
----
-
-## 🚀 GitHub Pages Deployment
+## 🚀 5. GitHub Pages Deployment
 
 1. Push this repository to GitHub.
 2. In GitHub, go to **Settings** > **Pages**.
