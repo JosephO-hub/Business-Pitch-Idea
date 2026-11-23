@@ -261,78 +261,107 @@
         </section>
 
         <!-- ========================================================== -->
-        <!-- VIEW 2: SHIFT BOARD / COVERAGE (ROLE-ADAPTIVE)             -->
+        <!-- VIEW 2: SHIFT BOARD & MASTER SCHEDULE (ROLE-ADAPTIVE)      -->
         <!-- ========================================================== -->
         <section class="view-panel" id="view-shifts">
           <div class="panel-section-header">
             <div>
-              <h1 class="view-heading" style="font-size: 2rem;">Shift board</h1>
-              <p class="view-subheading" id="shiftBoardSubtitle">Claim open shifts, offer your own shifts, or propose a replacement.</p>
+              <h1 class="view-heading" style="font-size: 2rem;">Master Schedule &amp; Coverage</h1>
+              <p class="view-subheading" id="shiftBoardSubtitle">Unified bi-weekly or monthly restaurant schedule with live shift coverage &amp; swap synchronization.</p>
             </div>
             <div id="shiftBoardHeaderRight"></div>
           </div>
 
-          <!-- EMPLOYEE VIEW: Master Schedule Card (matching Screenshot 2 & 3) -->
-          <div class="content-card" id="employeeMasterScheduleCard" style="display: none;">
-            <div class="content-card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
-              <div>
-                <h3 class="card-main-title" style="font-size: 1.1rem;">Master schedule</h3>
-                <span class="card-main-sub" id="masterScheduleSubCount">5 shifts shown</span>
+          <!-- Schedule Header Controls (Period Switcher, Date Range, Manager Actions) -->
+          <div class="schedule-header-controls">
+            <div class="schedule-header-left">
+              <div class="schedule-period-toggle" role="group" aria-label="Schedule Period">
+                <button type="button" class="btn-period-toggle active" data-period="biweekly" id="btnToggleBiweekly">
+                  Bi-Weekly (14 Days)
+                </button>
+                <button type="button" class="btn-period-toggle" data-period="monthly" id="btnToggleMonthly">
+                  Monthly (30 Days)
+                </button>
+              </div>
+              <span class="schedule-range-badge" id="scheduleRangeBadge">
+                📅 Nov 20 &ndash; Dec 3, 2026
+              </span>
+            </div>
+
+            <!-- Manager-Only Schedule Builder Actions (Hidden for Team Members) -->
+            <div class="manager-schedule-actions" id="managerScheduleActions" style="display: none;">
+              <button class="btn btn-peach" id="btnOpenScheduleBuilder" title="Open Bi-Weekly/Monthly Schedule Generator">
+                📅 Schedule Builder
+              </button>
+              <button class="btn btn-card-outline" id="btnOpenAddShiftModal" title="Manually Add a Shift">
+                + Add Shift
+              </button>
+            </div>
+          </div>
+
+          <!-- Master Schedule Card -->
+          <div class="content-card" id="masterScheduleCard">
+            <div class="schedule-filter-bar">
+              <div class="filter-chips-group">
+                <button type="button" class="sched-filter-chip active" data-sched-filter="all">
+                  All Shifts (<span id="schedCountAll">0</span>)
+                </button>
+                <button type="button" class="sched-filter-chip" data-sched-filter="my-shifts">
+                  My Shifts (<span id="schedCountMine">0</span>)
+                </button>
+                <button type="button" class="sched-filter-chip" data-sched-filter="grabs">
+                  Up for Grabs / Open (<span id="schedCountGrabs">0</span>)
+                </button>
+                <button type="button" class="sched-filter-chip" data-sched-filter="swapped">
+                  Covered / Swapped (<span id="schedCountSwapped">0</span>)
+                </button>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <label for="scheduleDateSelect" style="font-size:0.75rem; font-weight:700; color:var(--text-muted);">Day:</label>
+                <select id="scheduleDateSelect" class="access-role-select" style="min-width:160px; height:34px; font-size:0.8rem;">
+                  <option value="all">All Days in Period</option>
+                </select>
               </div>
             </div>
 
-            <div style="padding: 0 1.5rem 1rem 1.5rem;">
-              <select id="employeeShiftFilterSelect" class="access-role-select" style="width: 170px;">
-                <option value="all">All shifts</option>
-                <option value="my-shifts">My shifts</option>
-                <option value="claimable">Claimable shifts</option>
-              </select>
-            </div>
-
             <div class="table-container">
-              <table class="overview-table" id="employeeMasterScheduleTable">
+              <table class="overview-table" id="masterScheduleTable">
                 <thead>
                   <tr>
-                    <th>SHIFT</th>
-                    <th>WHEN</th>
-                    <th>ASSIGNED TO</th>
+                    <th>SHIFT &amp; STATION</th>
+                    <th>DATE &amp; TIME</th>
+                    <th>ASSIGNED STAFF</th>
                     <th>STATUS</th>
                     <th class="action-th">ACTIONS</th>
                   </tr>
                 </thead>
-                <tbody id="employeeMasterScheduleBody"></tbody>
+                <tbody id="masterScheduleBody"></tbody>
               </table>
             </div>
           </div>
 
-          <!-- MANAGER VIEW: Manager Active Validator (From Standards) -->
-          <div id="managerShiftCoverageView">
-            <div class="view-status-pills" style="margin-bottom: 1rem;">
-              <span class="legend-badge safe"><span class="dot green"></span> Safe to Approve</span>
-              <span class="legend-badge warning"><span class="dot amber"></span> Overtime Alert</span>
-              <span class="legend-badge mismatch"><span class="dot gray"></span> Role Mismatch</span>
+          <!-- Deterministic Coverage Validator Panel (Activates on Shift Select for Managers) -->
+          <div class="swap-engine-panel" id="swapEnginePanel" style="margin-top: 1.5rem;">
+            <div class="panel-header">
+              <div class="panel-header-left">
+                <span class="sub-badge">DETERMINISTIC VALIDATION ENGINE</span>
+                <h3 class="panel-title" id="swapTargetTitle">Select any scheduled shift above to evaluate replacement coverage</h3>
+                <p class="panel-subtitle" id="swapTargetSubtitle">Comparing all off-duty employees against station certifications and straight-time wage policies.</p>
+              </div>
+              <div class="panel-header-right" id="swapTargetActionContainer"></div>
             </div>
 
-            <div class="grid-shifts" id="scheduledShiftsGrid"></div>
+            <div class="candidate-filters">
+              <button class="filter-chip active" data-filter="all">All Candidates (<span id="countAll">0</span>)</button>
+              <button class="filter-chip safe" data-filter="safe">🟢 Qualified to Cover (<span id="countSafe">0</span>)</button>
+              <button class="filter-chip mismatch" data-filter="mismatch">⛔ Role Mismatch (<span id="countMismatch">0</span>)</button>
+            </div>
 
-            <div class="swap-engine-panel" id="swapEnginePanel">
-              <div class="panel-header">
-                <div class="panel-header-left">
-                  <span class="sub-badge">DETERMINISTIC VALIDATION ENGINE</span>
-                  <h3 class="panel-title" id="swapTargetTitle">Select a shift above to request coverage</h3>
-                  <p class="panel-subtitle" id="swapTargetSubtitle">Comparing all off-duty employees against station certifications and 40.0-hour overtime limits.</p>
-                </div>
-                <div class="panel-header-right" id="swapTargetActionContainer"></div>
+            <div class="candidates-grid" id="swapCandidatesGrid">
+              <div class="empty-state">
+                <p>Click <strong>"Validate Coverage"</strong> on any scheduled employee above to evaluate eligible replacement staff.</p>
               </div>
-
-              <div class="candidate-filters">
-                <button class="filter-chip active" data-filter="all">All Candidates (<span id="countAll">0</span>)</button>
-                <button class="filter-chip safe" data-filter="safe">🟢 Safe to Approve (<span id="countSafe">0</span>)</button>
-                <button class="filter-chip warning" data-filter="warning">⚠️ Overtime Alerts (<span id="countWarning">0</span>)</button>
-                <button class="filter-chip mismatch" data-filter="mismatch">⛔ Role Mismatch (<span id="countMismatch">0</span>)</button>
-              </div>
-
-              <div class="candidates-grid" id="swapCandidatesGrid"></div>
             </div>
           </div>
         </section>
@@ -530,7 +559,7 @@
           <div class="panel-section-header">
             <div>
               <h2 class="view-heading">Labor Compliance &amp; Audit Log</h2>
-              <p class="view-subheading">Tamper-evident logs of overtime authorizations, station qualification checks, and FLSA tip-credit compliance.</p>
+              <p class="view-subheading">Tamper-evident logs of schedule publications, coverage authorizations, station qualification checks, and FLSA tip-credit compliance.</p>
             </div>
           </div>
 
@@ -543,15 +572,39 @@
             </div>
             <div class="audit-card">
               <div class="audit-card-icon">⏱️</div>
-              <div class="audit-card-title">Overtime 40.0-Hour Rule Guard</div>
+              <div class="audit-card-title">Straight-Time Wage Policy</div>
               <div class="audit-status active">ACTIVE</div>
-              <p class="audit-desc">All swap requests exceeding 40.0 weekly hours trigger a mandatory 1.5x wage liability calculation before approval.</p>
+              <p class="audit-desc">Standard straight-time hourly rates apply to all shift hours. Zero 1.5x overtime rate adjustments or penalty multipliers.</p>
             </div>
             <div class="audit-card">
               <div class="audit-card-icon">🪙</div>
               <div class="audit-card-title">Cent Reconciliation Standard</div>
               <div class="audit-status passed">EXACT RECONCILED</div>
               <p class="audit-desc">Largest Remainder integer cent method guarantees zero penny variance between pool total and distributed shares.</p>
+            </div>
+          </div>
+
+          <!-- Verified Schedule & Coverage Audit Trail Card -->
+          <div class="content-card" style="margin-top: 1.5rem;">
+            <div class="content-card-header">
+              <div>
+                <h3 class="card-main-title">Verified Schedule &amp; Coverage Audit Trail</h3>
+                <p class="card-main-sub">Permanent record of schedule publications and manager-approved shift coverage reassignments</p>
+              </div>
+              <span class="sync-badge"><span class="sync-dot"></span> Live Log</span>
+            </div>
+            <div class="table-container">
+              <table class="overview-table" id="auditTrailTable">
+                <thead>
+                  <tr>
+                    <th>TIMESTAMP</th>
+                    <th>EVENT ACTION</th>
+                    <th>DETAILS</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTrailTableBody"></tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -592,7 +645,7 @@
         <button id="btnCloseSwapModal" class="btn-close" aria-label="Close Modal">&times;</button>
       </div>
       <form id="proposeSwapForm">
-        <div class="modal-body" style="background:#fff; flex-direction:column; gap:1rem;">
+        <div class="modal-body">
           <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:0.85rem;">
             <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">YOUR SHIFT TO TRADE</div>
             <div style="font-size:1rem; font-weight:800; color:var(--text-dark);" id="swapModalMyShiftTitle">Bartender (Bar close)</div>
@@ -633,7 +686,7 @@
         <button id="btnCloseAddMemberModal" class="btn-close" aria-label="Close Modal">&times;</button>
       </div>
       <form id="addMemberForm">
-        <div class="modal-body" style="background:#fff; flex-direction:column; gap:1rem;">
+        <div class="modal-body">
           <div class="form-group">
             <label for="newMemberName">Full Name</label>
             <input type="text" id="newMemberName" class="form-input" style="padding-left:0.85rem; font-size:1rem;" placeholder="e.g. Maya Chen" required>
@@ -657,6 +710,247 @@
           <button type="button" class="btn btn-card-outline" id="btnCancelAddMember">Cancel</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: MANAGER SCHEDULE BUILDER & GENERATOR                    -->
+  <!-- ============================================================== -->
+  <div id="scheduleBuilderModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-dialog" style="max-width: 520px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Manager Schedule Builder</h3>
+          <p class="modal-subtitle" style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+            Generate and publish unified restaurant schedules
+          </p>
+        </div>
+        <button id="btnCloseBuilderModal" class="btn-close" aria-label="Close Modal">&times;</button>
+      </div>
+      <form id="scheduleBuilderForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label style="font-weight:700; color:var(--text-dark);">Schedule Period Type:</label>
+            <div class="builder-period-radios">
+              <label class="radio-label">
+                <input type="radio" name="builderPeriod" value="biweekly" checked>
+                <span>Bi-Weekly (14 Days)</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="builderPeriod" value="monthly">
+                <span>Monthly (30 Days)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="builderStartDate" style="font-weight:700; color:var(--text-dark);">Period Start Date:</label>
+            <input type="date" id="builderStartDate" class="form-input" style="padding-left:0.85rem;" value="2026-11-20" required>
+            <span class="help-text" id="builderPeriodHelp" style="color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">
+              Coverage range: Fri, Nov 20 &ndash; Thu, Dec 3, 2026 (14 days)
+            </span>
+          </div>
+
+          <div class="builder-summary-box">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; font-weight:800; color:var(--color-forest);">STARTER TEMPLATE PREVIEW</span>
+              <span class="status-pill safe" style="font-size:0.7rem;">Balanced Staffing</span>
+            </div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0.35rem;">
+              Auto-populates clean dinner, lunch, bar, prep, and lead shifts across qualified staff with sample open &amp; up-for-grabs shifts.
+            </p>
+            <div class="builder-metrics-row">
+              <div class="builder-metric-box">
+                <div class="builder-metric-val" id="builderPreviewShifts">28</div>
+                <div class="builder-metric-lbl">Total Shifts</div>
+              </div>
+              <div class="builder-metric-box">
+                <div class="builder-metric-val" id="builderPreviewHours">168.0h</div>
+                <div class="builder-metric-lbl">Total Hours</div>
+              </div>
+              <div class="builder-metric-box">
+                <div class="builder-metric-val" id="builderPreviewStaff">8</div>
+                <div class="builder-metric-lbl">Staff Assigned</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="builderOtSummaryBox"></div>
+
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:0.75rem; font-size:0.78rem; color:#166534;">
+            🛡️ <strong>Single Source of Truth:</strong> Publishing saves all shifts directly into the unified schedule array in local storage, synchronizing with the swap request queue and bi-weekly tip pool.
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-peach" id="btnPublishBuilderSchedule" style="width:auto; padding:0.6rem 1.5rem;">
+            🚀 Create &amp; Publish Schedule
+          </button>
+          <button type="button" class="btn btn-card-outline" id="btnCancelBuilderModal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: ADD / EDIT SHIFT (MANAGER ONLY)                         -->
+  <!-- ============================================================== -->
+  <div id="shiftEditModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="shiftEditModalTitle">Add New Shift</h3>
+        <button id="btnCloseShiftEditModal" class="btn-close" aria-label="Close Modal">&times;</button>
+      </div>
+      <form id="shiftEditForm">
+        <input type="hidden" id="editShiftId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="editShiftDate">Shift Date</label>
+            <input type="date" id="editShiftDate" class="form-input" style="padding-left:0.85rem;" required>
+          </div>
+
+          <div class="form-group">
+            <label for="editShiftServiceName">Service / Shift Name</label>
+            <input type="text" id="editShiftServiceName" class="form-input" style="padding-left:0.85rem;" placeholder="e.g. Dinner service, Bar close, Lunch turnover" required>
+          </div>
+
+          <div class="input-group-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label for="editShiftRole">Station Role</label>
+              <select id="editShiftRole" class="access-role-select" style="width:100%; height:40px;">
+                <option value="Server">Server</option>
+                <option value="Bartender">Bartender</option>
+                <option value="Host">Host</option>
+                <option value="Busser">Busser</option>
+                <option value="Line cook">Line cook</option>
+                <option value="Shift Lead">Shift Lead</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="editShiftHours">Hours Duration</label>
+              <input type="number" id="editShiftHours" class="form-input" style="padding-left:0.85rem;" min="0.5" max="16" step="0.5" value="6.0" required>
+            </div>
+          </div>
+
+          <div class="input-group-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label for="editShiftStartTime">Start Time</label>
+              <input type="text" id="editShiftStartTime" class="form-input" style="padding-left:0.85rem;" placeholder="e.g. 4:00 PM" required>
+            </div>
+            <div class="form-group">
+              <label for="editShiftEndTime">End Time</label>
+              <input type="text" id="editShiftEndTime" class="form-input" style="padding-left:0.85rem;" placeholder="e.g. 10:00 PM" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editShiftAssignee">Assigned Staff Member</label>
+            <select id="editShiftAssignee" class="access-role-select" style="width:100%; height:40px;">
+              <!-- Populated dynamically via JS with all staff + Unassigned -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editShiftNotes">Station / Section Notes</label>
+            <input type="text" id="editShiftNotes" class="form-input" style="padding-left:0.85rem;" placeholder="e.g. Main Dining Room, Section 3, Craft Bar">
+          </div>
+
+          <div class="form-group">
+            <label for="editShiftStatus">Shift Status</label>
+            <select id="editShiftStatus" class="access-role-select" style="width:100%; height:40px;">
+              <option value="Covered">Covered</option>
+              <option value="Up for Grabs">Up for Grabs</option>
+              <option value="Open">Open</option>
+            </select>
+          </div>
+
+          <!-- Inline Overtime Warning Banner -->
+          <div id="editShiftOtWarning" class="modal-ot-warning" style="display: none;">
+            <div class="ot-warning-header">
+              <span class="ot-warning-icon">⚠️</span>
+              <span class="ot-warning-title">Overtime Warning (40.0h Weekly Threshold Exceeded)</span>
+            </div>
+            <div class="ot-warning-body" id="editShiftOtDetails">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="ot-warning-actions" id="editShiftOtActions" style="display: none;">
+              <button type="button" class="btn btn-warning-action" id="btnConfirmSaveWithOt">
+                ⚠️ Confirm &amp; Save with Overtime
+              </button>
+              <button type="button" class="btn btn-card-outline" id="btnCancelOtSave">
+                Go Back / Reassign
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-peach" id="btnSaveShiftDefault" style="width:auto; padding:0.6rem 1.5rem;">Save Shift</button>
+          <button type="button" class="btn btn-card-outline" id="btnCancelShiftEdit">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: OVERTIME APPROVAL CONFIRMATION (MANAGER ONLY)           -->
+  <!-- ============================================================== -->
+  <div id="otApprovalModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="font-size:1.3rem;">⚠️</span>
+          <div>
+            <h3 class="modal-title" style="color:#92400E;">Overtime Warning Confirmation</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1px;">
+              Manager authorization required for shift changes exceeding 40.0 weekly hours
+            </p>
+          </div>
+        </div>
+        <button id="btnCloseOtApprovalModal" class="btn-close" aria-label="Close Modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#FFFBEB; border:1px solid #FCD34D; border-radius:8px; padding:0.85rem;">
+          <div style="font-size:0.75rem; color:#92400E; font-weight:700; text-transform:uppercase;">Coverage Assignment</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#78350F; margin-top:0.2rem;" id="otApprovalShiftTitle">
+            Bartender (Bar close) &bull; Sat, Nov 21
+          </div>
+          <div style="font-size:0.85rem; color:#92400E; margin-top:0.35rem;" id="otApprovalWorkerSummary">
+            Sofia Reyes will go from 36.0 hrs to 42.0 hrs this week &mdash; +2.0 hrs overtime.
+          </div>
+        </div>
+
+        <div class="ot-metrics-grid">
+          <div class="ot-metric-box">
+            <div class="ot-metric-val" id="otMetricCurrent">36.0h</div>
+            <div class="ot-metric-lbl">Current Weekly</div>
+          </div>
+          <div class="ot-metric-box">
+            <div class="ot-metric-val" id="otMetricAdding">+6.0h</div>
+            <div class="ot-metric-lbl">Shift Hours</div>
+          </div>
+          <div class="ot-metric-box highlight">
+            <div class="ot-metric-val" id="otMetricNew">42.0h</div>
+            <div class="ot-metric-lbl">New Total</div>
+          </div>
+          <div class="ot-metric-box highlight">
+            <div class="ot-metric-val" id="otMetricOt">+2.0h</div>
+            <div class="ot-metric-lbl">Overtime</div>
+          </div>
+        </div>
+
+        <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:0.75rem; font-size:0.76rem; color:#4B5563; line-height:1.45;">
+          🛡️ <strong>Restaurant Standards Note:</strong> All worker pay and tip-pool payouts remain calculated strictly using standard straight-time hours (no 1.5&times; multiplier). Approving will record an official overtime override note in the verified audit log.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-warning-full" id="btnConfirmOtApproval">
+          Approve Anyway
+        </button>
+        <button type="button" class="btn btn-card-outline" id="btnCancelOtApproval">
+          Cancel
+        </button>
+      </div>
     </div>
   </div>
 
