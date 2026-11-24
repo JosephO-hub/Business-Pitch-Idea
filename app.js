@@ -338,6 +338,7 @@
   const INITIAL_AUDIT_LOG = [
     {
       id: 'audit-1',
+      userId: 'usr-1',
       timestamp: 'Nov 20, 2026, 09:00 AM',
       action: 'Schedule Published',
       details: 'Bi-Weekly schedule generated & published by Paul Parajuli (Admin). 28 shifts created.',
@@ -346,19 +347,41 @@
     },
     {
       id: 'audit-2',
+      userId: 'usr-2', // Maya Chen
+      targetUserId: 'usr-3', // Jordan Ellis
       timestamp: 'Nov 20, 2026, 02:30 PM',
       action: 'Shift Swap Authorized',
-      details: 'Maya Chen covered Server shift (Mon, Nov 23, 6.0h). Previously assigned to: Jordan Ellis.',
+      details: 'Manager approved Maya Chen covering Server shift (Mon, Nov 23, 6.0h). Previously assigned to: Jordan Ellis.',
       type: 'coverage',
       status: 'APPROVED'
     },
     {
       id: 'audit-3',
+      userId: 'usr-3', // Jordan Ellis
       timestamp: 'Nov 20, 2026, 04:15 PM',
-      action: 'Shift Put Up for Grabs',
-      details: 'Jordan Ellis placed Sat, Nov 21 Bartender shift (6.0h) Up for Grabs.',
+      action: 'Shift Coverage Offered',
+      details: 'Jordan Ellis placed Sat, Nov 21 Bartender shift (6.0h) Up for Grabs for coverage.',
       type: 'coverage',
       status: 'POSTED'
+    },
+    {
+      id: 'audit-4',
+      userId: 'usr-2', // Maya Chen
+      timestamp: 'Nov 20, 2026, 04:30 PM',
+      action: 'Open Shift Claim Submitted',
+      details: 'Maya Chen submitted request to claim Open Server shift on Fri, Nov 20 (Dinner service, 6.0h). Awaiting manager review.',
+      type: 'coverage',
+      status: 'SUBMITTED'
+    },
+    {
+      id: 'audit-5',
+      userId: 'usr-4', // Sofia Reyes
+      targetUserId: 'usr-3', // Jordan Ellis
+      timestamp: 'Nov 20, 2026, 04:45 PM',
+      action: 'Shift Swap Proposed',
+      details: 'Sofia Reyes proposed trade with Jordan Ellis for Sat, Nov 21 Bartender shift (Bar close, 6.0h). Awaiting manager review.',
+      type: 'coverage',
+      status: 'SUBMITTED'
     }
   ];
 
@@ -532,7 +555,8 @@
     },
     scheduleViewPeriod: 'biweekly', // 'biweekly' or 'monthly'
     scheduleDisplayMode: 'list', // 'list' or 'calendar'
-    scheduleFilter: 'all', // 'all', 'my-shifts', 'grabs', 'swapped'
+    scheduleFilter: 'all', // 'all', 'my-shifts', 'grabs', 'swapped', 'overtime'
+    scheduleFilterUser: null,
     scheduleDateFilter: 'all',
     calendarYear: 2026,
     calendarMonth: 10, // 0-indexed: 10 = November
@@ -582,7 +606,16 @@
           });
           state.roleWeights = Object.assign({}, DEFAULT_WEIGHTS, state.roleWeights);
           state.roleWeights['Shift Lead'] = 0.0;
-          if (!state.auditLog) state.auditLog = JSON.parse(JSON.stringify(INITIAL_AUDIT_LOG));
+          if (!state.auditLog || state.auditLog.length === 0) {
+            state.auditLog = JSON.parse(JSON.stringify(INITIAL_AUDIT_LOG));
+          } else {
+            state.auditLog.forEach(log => {
+              if (!log.userId) {
+                const found = state.users.find(u => log.details && log.details.includes(u.name));
+                if (found) log.userId = found.id;
+              }
+            });
+          }
           if (!state.scheduleSettings) {
             state.scheduleSettings = {
               periodType: 'biweekly',
@@ -594,6 +627,7 @@
           if (!state.scheduleViewPeriod) state.scheduleViewPeriod = 'biweekly';
           if (!state.scheduleDisplayMode) state.scheduleDisplayMode = 'list';
           if (!state.scheduleFilter) state.scheduleFilter = 'all';
+          if (state.scheduleFilterUser === undefined) state.scheduleFilterUser = null;
           if (!state.scheduleDateFilter) state.scheduleDateFilter = 'all';
           if (state.calendarYear === undefined) state.calendarYear = 2026;
           if (state.calendarMonth === undefined) state.calendarMonth = 10;
@@ -642,6 +676,7 @@
       scheduleViewPeriod: 'biweekly',
       scheduleDisplayMode: 'list',
       scheduleFilter: 'all',
+      scheduleFilterUser: null,
       scheduleDateFilter: 'all',
       calendarYear: 2026,
       calendarMonth: 10, // November 2026
@@ -804,6 +839,11 @@
           <span class="nav-label">My requests</span>
           ${myOpenRequestsCount > 0 ? `<span class="nav-counter">${myOpenRequestsCount}</span>` : ''}
         </button>
+
+        <button class="nav-item ${state.currentView === 'view-audit' ? 'active' : ''}" data-view="view-audit">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg></span>
+          <span class="nav-label">Audit log</span>
+        </button>
       `;
     }
   }
@@ -905,6 +945,10 @@
       return;
     }
 
+    const isUpForGrabs = !!shift.userId;
+    const prevUser = isUpForGrabs ? getUserById(shift.userId) : null;
+    const prevName = prevUser ? prevUser.name : 'Unassigned / Open';
+
     const newApproval = {
       id: 'app-' + Date.now(),
       userId: user.id,
@@ -917,14 +961,35 @@
       actionType: 'Claim',
       status: 'Awaiting manager review',
       date: shift.scheduleDate,
-      note: `${user.name} requested to claim ${shift.role} (${shift.serviceName})`
+      targetUserId: isUpForGrabs ? shift.userId : null,
+      note: isUpForGrabs
+        ? `${user.name} offered to cover ${prevName}'s ${shift.role} shift`
+        : `${user.name} requested to claim open ${shift.role} (${shift.serviceName})`
     };
 
     state.approvals.push(newApproval);
+
+    // Audit log entry for employee activity log
+    state.auditLog.unshift({
+      id: 'audit-' + Date.now(),
+      userId: user.id,
+      targetUserId: isUpForGrabs ? shift.userId : null,
+      timestamp: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      action: isUpForGrabs ? 'Coverage Request Submitted' : 'Open Shift Claim Submitted',
+      details: isUpForGrabs
+        ? `${user.name} submitted request to cover ${prevName}'s ${shift.role} shift on ${shift.scheduleDate} (${shift.serviceName}, ${shift.hours.toFixed(1)}h). Awaiting manager review.`
+        : `${user.name} submitted request to claim Open ${shift.role} shift on ${shift.scheduleDate} (${shift.serviceName}, ${shift.hours.toFixed(1)}h). Awaiting manager review.` ,
+      type: 'coverage',
+      status: 'SUBMITTED'
+    });
+
     saveState();
     renderAll();
 
-    showToast(`Claim request submitted for ${shift.role} (${shift.scheduleDate})! Awaiting manager review.`, 'success');
+    showToast(isUpForGrabs
+      ? `Coverage request submitted to cover ${prevName} on ${shift.scheduleDate}! Awaiting manager review.`
+      : `Claim request submitted for Open ${shift.role} (${shift.scheduleDate})! Awaiting manager review.`,
+      'success');
   }
 
   function handleEmployeeOfferCoverage(shiftId) {
@@ -937,9 +1002,10 @@
 
     state.auditLog.unshift({
       id: 'audit-' + Date.now(),
+      userId: user.id,
       timestamp: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      action: 'Shift Put Up for Grabs',
-      details: `${user.name} placed ${shift.role} (${shift.scheduleDate}, ${shift.hours.toFixed(1)}h) Up for Grabs.`,
+      action: 'Shift Coverage Offered',
+      details: `${user.name} placed ${shift.role} (${shift.scheduleDate}, ${shift.hours.toFixed(1)}h) Up for Grabs for coverage.`,
       type: 'coverage',
       status: 'POSTED'
     });
@@ -1107,17 +1173,29 @@
       });
 
       // 2. Record Verified Audit Log Entry
-      let auditDetails = `${claimingUser.name} officially assigned to ${shift.role} (${shift.scheduleDate}, ${shift.hours.toFixed(1)}h). Previously assigned to: ${prevName}.`;
+      const isOpenShift = !prevUserId || prevName.includes('Unassigned') || prevName.includes('Open');
+      let actionLabel = 'Shift Claim Authorized';
+      if (app.actionType === 'Swap') {
+        actionLabel = 'Shift Swap Authorized';
+      } else if (isOpenShift) {
+        actionLabel = 'Open Shift Claim Approved';
+      } else {
+        actionLabel = 'Shift Coverage Approved';
+      }
+
+      let auditDetails = `Manager approved ${claimingUser.name} for ${shift.role} (${shift.scheduleDate}, ${shift.hours.toFixed(1)}h). Previously assigned to: ${prevName}.`;
       if (ot && ot.isOvertime) {
-        auditDetails = `Approved with overtime warning: ${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) scheduled for ${ot.newWeeklyTotal.toFixed(1)} weekly hrs (+${ot.hoursOver.toFixed(1)} hrs over). ${shift.role} on ${shift.scheduleDate} authorized. Previous: ${prevName}.`;
+        auditDetails = `Manager approved with overtime warning: ${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) scheduled for ${ot.newWeeklyTotal.toFixed(1)} weekly hrs (+${ot.hoursOver.toFixed(1)} hrs over). ${shift.role} on ${shift.scheduleDate} authorized. Previous: ${prevName}.`;
       }
 
       state.auditLog.unshift({
         id: 'audit-' + Date.now(),
+        userId: claimingUser.id,
+        targetUserId: prevUserId || (app.targetUserId || null),
         timestamp: new Date().toLocaleString('en-US', {
           month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }),
-        action: app.actionType === 'Swap' ? 'Shift Swap Authorized' : 'Shift Claim Authorized',
+        action: actionLabel,
         details: auditDetails,
         type: 'coverage',
         status: 'APPROVED'
@@ -1141,6 +1219,8 @@
 
     state.auditLog.unshift({
       id: 'audit-' + Date.now(),
+      userId: app.userId,
+      targetUserId: app.targetUserId || null,
       timestamp: new Date().toLocaleString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
       }),
@@ -1971,6 +2051,110 @@
     return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
   }
 
+  // =========================================================================
+  // Manager-Only Team Work Hours & Overtime Tracker Panel
+  // =========================================================================
+
+  function renderTeamHoursTrackerPanel(periodShifts) {
+    const panel = document.getElementById('teamHoursTrackerPanel');
+    const grid = document.getElementById('teamHoursGrid');
+    const metricsEl = document.getElementById('teamHoursSummaryMetrics');
+    if (!panel || !grid) return;
+
+    if (!isManagerUser()) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+
+    grid.innerHTML = '';
+
+    let totalStaff = state.users.length;
+    let safeCount = 0;
+    let otCount = 0;
+
+    state.users.forEach(u => {
+      // Find all shifts assigned to this user in the active period
+      const userShifts = periodShifts.filter(s => s.userId === u.id);
+      const totalPeriodHours = userShifts.reduce((acc, s) => acc + s.hours, 0);
+      const shiftCount = userShifts.length;
+
+      // Check weekly scheduled hours
+      const weeklyHours = u.weeklyHours || 0;
+      const threshold = u.employmentType === 'part-time' ? 32.0 : 40.0;
+      const isOvertime = weeklyHours > threshold;
+      const hoursOver = isOvertime ? parseFloat((weeklyHours - threshold).toFixed(1)) : 0;
+      const buffer = !isOvertime ? parseFloat((threshold - weeklyHours).toFixed(1)) : 0;
+      const pct = Math.min(100, Math.round((weeklyHours / threshold) * 100));
+
+      if (isOvertime) otCount++;
+      else safeCount++;
+
+      const isCurrentFilterUser = state.scheduleFilterUser === u.id;
+
+      const card = document.createElement('div');
+      card.className = `team-member-hours-card ${isOvertime ? 'has-ot' : ''} ${isCurrentFilterUser ? 'active-filtered' : ''}`;
+      card.setAttribute('data-action', 'filter-schedule-user');
+      card.setAttribute('data-user-id', u.id);
+      card.setAttribute('title', `Click to filter schedule shifts for ${u.name}`);
+
+      let fillClass = 'safe';
+      if (isOvertime) fillClass = 'danger';
+      else if (pct >= 90) fillClass = 'warning';
+
+      let statusBadge = '';
+      if (isOvertime) {
+        statusBadge = `<span class="hours-status-pill ot">⚠️ +${hoursOver.toFixed(1)}h OT</span>`;
+      } else if (weeklyHours === threshold) {
+        statusBadge = `<span class="hours-status-pill limit">🟡 At Limit (${threshold.toFixed(0)}h)</span>`;
+      } else {
+        statusBadge = `<span class="hours-status-pill safe">🟢 ${buffer.toFixed(1)}h Buffer</span>`;
+      }
+
+      card.innerHTML = `
+        <div class="card-member-top">
+          <div class="card-member-info">
+            <span class="user-circle ${(u.initials || 'mc').toLowerCase()}" style="width:28px;height:28px;font-size:0.7rem;">${u.initials}</span>
+            <div>
+              <div class="card-member-name">${u.name}</div>
+              <div class="card-member-role">${(u.certifications && u.certifications[0]) || u.role}</div>
+            </div>
+          </div>
+          <span class="employment-badge ${u.employmentType === 'part-time' ? 'pt' : 'ft'}">${u.employmentType === 'part-time' ? 'PT 32h' : 'FT 40h'}</span>
+        </div>
+
+        <div class="card-hours-row">
+          <div>
+            <span class="card-hours-big ${isOvertime ? 'ot' : ''}">${weeklyHours.toFixed(1)}h</span>
+            <span class="card-hours-sub">/ ${threshold.toFixed(0)}h limit</span>
+          </div>
+          <div class="card-hours-sub">${shiftCount} shift${shiftCount === 1 ? '' : 's'} (${totalPeriodHours.toFixed(1)}h)</div>
+        </div>
+
+        <div class="card-progress-bar">
+          <div class="card-progress-fill ${fillClass}" style="width: ${pct}%;"></div>
+        </div>
+
+        <div class="card-status-footer">
+          ${statusBadge}
+          <span style="font-size:0.68rem; color:var(--text-muted); font-weight:600;">${isCurrentFilterUser ? '✓ Filter active' : 'Click to filter'}</span>
+        </div>
+      `;
+
+      grid.appendChild(card);
+    });
+
+    if (metricsEl) {
+      metricsEl.innerHTML = `
+        <span class="tracker-metric-pill">👥 ${totalStaff} Staff Monitored</span>
+        <span class="tracker-metric-pill" style="color:#166534;">🟢 ${safeCount} Safe (No OT)</span>
+        ${otCount > 0 
+          ? `<span class="tracker-metric-pill ot-count">⚠️ ${otCount} Overtime Risk</span>` 
+          : `<span class="tracker-metric-pill" style="color:#166534;">✓ Zero Overtime</span>`}
+      `;
+    }
+  }
+
   function renderShiftBoardView() {
     const isMgr = isManagerUser();
     const user = getCurrentUser();
@@ -2088,17 +2272,31 @@
     const countGrabs = periodShifts.filter(s => s.status === 'Up for Grabs' || !s.userId).length;
     const countSwapped = periodShifts.filter(s => s.isSwapped || s.statusClass === 'swapped').length;
 
+    const otShifts = periodShifts.filter(s => {
+      if (!s.userId) return false;
+      const ot = checkEmployeeOvertime(s.userId, s.dateIso, 0);
+      return ot && ot.isOvertime;
+    });
+    const countOt = otShifts.length;
+
     const elCountAll = document.getElementById('schedCountAll');
     const elCountMine = document.getElementById('schedCountMine');
     const elCountGrabs = document.getElementById('schedCountGrabs');
     const elCountSwapped = document.getElementById('schedCountSwapped');
+    const elCountOt = document.getElementById('schedCountOt');
+    const filterChipOt = document.getElementById('filterChipOt');
 
     if (elCountAll) elCountAll.textContent = countAll;
     if (elCountMine) elCountMine.textContent = countMine;
     if (elCountGrabs) elCountGrabs.textContent = countGrabs;
     if (elCountSwapped) elCountSwapped.textContent = countSwapped;
+    if (elCountOt) elCountOt.textContent = countOt;
+    if (filterChipOt) filterChipOt.style.display = isMgr ? 'inline-flex' : 'none';
 
-    // 7. Apply Filters (Status + Day)
+    // 6b. Render Manager Team Work Hours & Overtime Tracker Panel
+    renderTeamHoursTrackerPanel(periodShifts);
+
+    // 7. Apply Filters (Status + Day + Clicked Staff Member)
     const activeFilter = state.scheduleFilter || 'all';
     const activeDay = state.scheduleDateFilter || 'all';
 
@@ -2110,6 +2308,12 @@
       displayShifts = displayShifts.filter(s => s.status === 'Up for Grabs' || !s.userId);
     } else if (activeFilter === 'swapped') {
       displayShifts = displayShifts.filter(s => s.isSwapped || s.statusClass === 'swapped');
+    } else if (activeFilter === 'overtime') {
+      displayShifts = otShifts;
+    }
+
+    if (state.scheduleFilterUser) {
+      displayShifts = displayShifts.filter(s => s.userId === state.scheduleFilterUser);
     }
 
     if (activeDay !== 'all') {
@@ -2246,19 +2450,34 @@
                 <div style="display:flex; align-items:center; gap:0.5rem;">
                   <span class="user-circle ${(assignedUser.initials || 'mc').toLowerCase()}" style="width:28px;height:28px;font-size:0.7rem;">${assignedUser.initials}</span>
                   <div>
-                    <span class="td-main-bold" style="${isMine ? 'color:#059669;' : ''}">
-                      ${assignedUser.name}${isMine ? ' (You)' : ''}
-                    </span>
-                    <span class="employment-badge ${assignedUser.employmentType === 'part-time' ? 'pt' : 'ft'}" style="margin-left:0.35rem;">
-                      ${assignedUser.employmentType === 'part-time' ? 'PT 32h' : 'FT 40h'}
-                    </span>
+                    <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                      <span class="td-main-bold" style="${isMine ? 'color:#059669;' : ''}">
+                        ${assignedUser.name}${isMine ? ' (You)' : ''}
+                      </span>
+                      <span class="employment-badge ${assignedUser.employmentType === 'part-time' ? 'pt' : 'ft'}">
+                        ${assignedUser.employmentType === 'part-time' ? 'PT 32h' : 'FT 40h'}
+                      </span>
+                    </div>
+                    ${isMgr && ot ? `
+                      <div class="staff-scheduled-hours-pill ${ot.isOvertime ? 'ot-alert' : (ot.currentWeeklyHours >= ot.threshold ? 'at-limit' : 'safe')}" title="Total weekly scheduled hours for ${assignedUser.name} in ${ot.weekLabel}">
+                        <span>⏱️ <strong>${ot.currentWeeklyHours.toFixed(1)}h</strong> scheduled</span>
+                        <span>&bull;</span>
+                        <span>${ot.isOvertime ? `⚠️ +${ot.hoursOver.toFixed(1)}h OT` : (ot.currentWeeklyHours >= ot.threshold ? 'At Limit' : `${(ot.threshold - ot.currentWeeklyHours).toFixed(1)}h buffer`)}</span>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
               ` : '<span style="color:#D97706; font-weight:700;">Open (Unassigned)</span>'}
             </td>
             <td>
               ${statusBadgeHtml}
-              ${otBadgeHtml}
+              ${isMgr && ot && ot.isOvertime ? `
+                <div style="margin-top:0.25rem;">
+                  <span class="status-pill ot-risk" style="font-size:0.68rem;" title="${assignedUser?.name} scheduled for ${ot.currentWeeklyHours.toFixed(1)}h in ${ot.weekLabel} (${ot.threshold.toFixed(0)}h limit)">
+                    ⚠️ Overtime Alert (+${ot.hoursOver.toFixed(1)}h)
+                  </span>
+                </div>
+              ` : ''}
             </td>
             <td class="action-th">
               ${actionButtons}
@@ -2908,34 +3127,188 @@
         const card = document.createElement('div');
         card.className = 'approval-card-item';
         const claimingUser = getUserById(app.userId);
-        const ot = (shift && claimingUser) ? checkEmployeeOvertime(claimingUser.id, shift.dateIso, shift.hours) : null;
-        const otBadge = (ot && ot.isOvertime) 
-          ? `<span class="status-pill ot-risk" style="margin-top:0.35rem;">⚠️ ${ot.badgeText}</span>` 
-          : '';
-        const empBadge = claimingUser 
-          ? `<span class="employment-badge ${claimingUser.employmentType === 'part-time' ? 'pt' : 'ft'}" style="margin-left:0.35rem;">${claimingUser.employmentType === 'part-time' ? 'Part-Time • 32h' : 'Full-Time • 40h'}</span>` 
+
+        // Determine partner user (for Swaps or when claiming an assigned shift)
+        let partnerUser = null;
+        if (app.targetUserId) {
+          partnerUser = getUserById(app.targetUserId);
+        } else if (shift && shift.userId && shift.userId !== app.userId) {
+          partnerUser = getUserById(shift.userId);
+        }
+
+        const shiftHours = shift ? shift.hours : 6.0;
+
+        // Primary requesting user overtime analysis
+        let claimantCurrentHours = 0;
+        let claimantProjectedHours = 0;
+        let claimantThreshold = 40.0;
+        let claimantIsOt = false;
+        let claimantHoursOver = 0;
+        let claimantBuffer = 0;
+
+        if (claimingUser) {
+          claimantCurrentHours = getEmployeeHoursForWeek(claimingUser.id, shift ? shift.dateIso : null);
+          claimantThreshold = claimingUser.employmentType === 'part-time' ? 32.0 : 40.0;
+          claimantProjectedHours = parseFloat((claimantCurrentHours + shiftHours).toFixed(1));
+          claimantIsOt = claimantProjectedHours > claimantThreshold;
+          claimantHoursOver = claimantIsOt ? parseFloat((claimantProjectedHours - claimantThreshold).toFixed(1)) : 0;
+          claimantBuffer = !claimantIsOt ? parseFloat((claimantThreshold - claimantProjectedHours).toFixed(1)) : 0;
+        }
+
+        // Partner / Releasing user analysis (if applicable)
+        let partnerCurrentHours = 0;
+        let partnerProjectedHours = 0;
+        let partnerThreshold = 40.0;
+        let partnerIsOt = false;
+        let partnerBuffer = 0;
+
+        if (partnerUser && partnerUser.id !== claimingUser?.id) {
+          partnerCurrentHours = getEmployeeHoursForWeek(partnerUser.id, shift ? shift.dateIso : null);
+          partnerThreshold = partnerUser.employmentType === 'part-time' ? 32.0 : 40.0;
+          partnerProjectedHours = Math.max(0, parseFloat((partnerCurrentHours - shiftHours).toFixed(1)));
+          partnerIsOt = partnerProjectedHours > partnerThreshold;
+          partnerBuffer = !partnerIsOt ? parseFloat((partnerThreshold - partnerProjectedHours).toFixed(1)) : 0;
+        }
+
+        const hasOvertimeAlert = claimantIsOt || partnerIsOt;
+
+        const claimantEmpBadge = claimingUser 
+          ? `<span class="employment-badge ${claimingUser.employmentType === 'part-time' ? 'pt' : 'ft'}">${claimingUser.employmentType === 'part-time' ? 'Part-Time • 32h limit' : 'Full-Time • 40h limit'}</span>` 
           : '';
 
+        const partnerEmpBadge = partnerUser 
+          ? `<span class="employment-badge ${partnerUser.employmentType === 'part-time' ? 'pt' : 'ft'}">${partnerUser.employmentType === 'part-time' ? 'Part-Time • 32h limit' : 'Full-Time • 40h limit'}</span>` 
+          : '';
+
+        // Natural language impact summary
+        let impactSummaryText = '';
+        if (app.actionType === 'Swap' && partnerUser) {
+          if (claimantIsOt) {
+            impactSummaryText = `⚠️ <strong>Overtime Warning:</strong> Approving this swap assigns ${shiftHours.toFixed(1)} hrs to <strong>${claimingUser.name}</strong>, raising their scheduled weekly hours from ${claimantCurrentHours.toFixed(1)}h to <strong>${claimantProjectedHours.toFixed(1)} hrs</strong> (+${claimantHoursOver.toFixed(1)} hrs over ${claimantThreshold.toFixed(0)}h limit at 1.5x pay). <strong>${partnerUser.name}</strong> is relieved of ${shiftHours.toFixed(1)}h (reduced from ${partnerCurrentHours.toFixed(1)}h to ${partnerProjectedHours.toFixed(1)}h).`;
+          } else {
+            impactSummaryText = `🟢 <strong>Safe to Approve:</strong> Approving this swap assigns ${shiftHours.toFixed(1)} hrs to <strong>${claimingUser.name}</strong> (total: <strong>${claimantProjectedHours.toFixed(1)} hrs</strong>, safely within ${claimantThreshold.toFixed(0)}h limit) and relieves <strong>${partnerUser.name}</strong> of ${shiftHours.toFixed(1)} hrs (reduced to ${partnerProjectedHours.toFixed(1)} hrs). Zero overtime incurred.`;
+          }
+        } else {
+          // Claim
+          if (claimantIsOt) {
+            impactSummaryText = `⚠️ <strong>Overtime Alert:</strong> Approving this claim adds ${shiftHours.toFixed(1)} hrs to <strong>${claimingUser.name}</strong>, increasing their total scheduled hours from ${claimantCurrentHours.toFixed(1)}h to <strong>${claimantProjectedHours.toFixed(1)} hrs</strong> (+${claimantHoursOver.toFixed(1)} hrs over their ${claimantThreshold.toFixed(0)}h limit at 1.5x pay).`;
+          } else {
+            impactSummaryText = `🟢 <strong>Safe to Approve:</strong> Approving this claim adds ${shiftHours.toFixed(1)} hrs to <strong>${claimingUser.name}</strong>, bringing their scheduled hours from ${claimantCurrentHours.toFixed(1)}h to <strong>${claimantProjectedHours.toFixed(1)} hrs</strong> (${claimantBuffer.toFixed(1)} hrs remaining under ${claimantThreshold.toFixed(0)}h limit). Zero overtime incurred.`;
+          }
+        }
+
         card.innerHTML = `
-          <div style="display:flex; align-items:center; gap:1rem;">
-            <div class="user-circle ${app.circleClass}">${app.initials}</div>
-            <div>
-              <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">${app.actionType}: ${app.shiftRole} (${app.shiftName})</div>
-              <div style="font-size:0.8rem; color:var(--text-muted);">${app.date} &bull; Requested by ${app.name} ${empBadge}</div>
-              <div style="font-size:0.8rem; color:var(--text-dark); margin-top:0.25rem;"><em>"${app.note}"</em></div>
-              <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; margin-top:0.35rem;">
-                ${shift?.isSwapped ? '<span class="status-pill swapped">Previously Swapped</span>' : ''}
-                ${otBadge}
+          <div class="approval-card-top">
+            <div style="display:flex; align-items:center; gap:1rem;">
+              <div class="user-circle ${app.circleClass}">${app.initials}</div>
+              <div>
+                <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">
+                  ${app.actionType}: ${app.shiftRole} (${app.shiftName})
+                </div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.15rem;">
+                  📅 ${app.date} &bull; ${shift ? `${shift.startTime} – ${shift.endTime} (${shift.hours.toFixed(1)} hrs)` : '6.0 hrs'} &bull; Requested by <strong>${app.name}</strong> ${claimantEmpBadge}
+                </div>
+                <div style="font-size:0.82rem; color:var(--text-dark); margin-top:0.25rem;">
+                  <em>"${app.note}"</em>
+                </div>
               </div>
             </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button class="btn ${hasOvertimeAlert ? 'btn-warning-action' : 'btn-peach'}" data-action="authorize-approval" data-app-id="${app.id}">
+                ${hasOvertimeAlert ? '⚠️ Review OT & Authorize' : 'Authorize Shift Change'}
+              </button>
+              <button class="btn btn-card-outline" data-action="dismiss-approval" data-app-id="${app.id}">
+                Dismiss
+              </button>
+            </div>
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <button class="btn ${ot && ot.isOvertime ? 'btn-warning-action' : 'btn-peach'}" data-action="authorize-approval" data-app-id="${app.id}">
-              ${ot && ot.isOvertime ? '⚠️ Review OT & Authorize' : 'Authorize'}
-            </button>
-            <button class="btn btn-card-outline" data-action="dismiss-approval" data-app-id="${app.id}">
-              Dismiss
-            </button>
+
+          <!-- Scheduled Work Hours & Overtime Impact Breakdown -->
+          <div class="approval-impact-card ${hasOvertimeAlert ? 'has-ot' : ''}">
+            <div class="approval-impact-header">
+              <span class="impact-tag">
+                ⏱️ SCHEDULED WORK HOURS &amp; OVERTIME IMPACT
+              </span>
+              ${hasOvertimeAlert 
+                ? '<span class="approval-ot-badge ot-risk">⚠️ Overtime Alert Triggered</span>' 
+                : '<span class="approval-ot-badge safe">🟢 Safe to Approve (Zero Overtime)</span>'}
+            </div>
+
+            <div class="approval-impact-grid">
+              <!-- Claimant / Requesting User Box -->
+              <div class="approval-user-box ${claimantIsOt ? 'ot-alert' : ''}">
+                <div class="approval-user-box-top">
+                  <div class="approval-user-info">
+                    <span class="user-circle ${(claimingUser?.initials || 'mc').toLowerCase()}" style="width:24px;height:24px;font-size:0.65rem;">${claimingUser?.initials || 'MC'}</span>
+                    <div>
+                      <div class="approval-user-name">${claimingUser?.name || app.name}</div>
+                      <div class="approval-user-role">${app.actionType === 'Swap' ? 'Swap Recipient' : 'Claiming Staff'} &bull; ${claimantEmpBadge}</div>
+                    </div>
+                  </div>
+                  ${claimantIsOt 
+                    ? `<span class="approval-ot-badge ot-risk">⚠️ +${claimantHoursOver.toFixed(1)}h OT</span>` 
+                    : `<span class="approval-ot-badge safe">🟢 Safe (${claimantBuffer.toFixed(1)}h buffer)</span>`}
+                </div>
+
+                <div class="approval-metrics-row">
+                  <div class="approval-metric-item">
+                    <span class="approval-metric-label">Currently Scheduled</span>
+                    <span class="approval-metric-val">${claimantCurrentHours.toFixed(1)} hrs</span>
+                  </div>
+                  <div class="approval-metric-item">
+                    <span class="approval-metric-label">Shift Impact</span>
+                    <span class="approval-metric-val" style="color:#0284C7;">+${shiftHours.toFixed(1)} hrs</span>
+                  </div>
+                  <div class="approval-metric-item">
+                    <span class="approval-metric-label">Projected Total</span>
+                    <span class="approval-metric-val ${claimantIsOt ? 'proj-ot' : 'proj-safe'}">${claimantProjectedHours.toFixed(1)} hrs</span>
+                  </div>
+                </div>
+
+                <div style="font-size:0.75rem; color:var(--text-muted);">
+                  Limit: <strong>${claimantThreshold.toFixed(0)} hrs/week</strong> &bull; Status: ${claimantIsOt ? `<strong style="color:#B45309;">${claimantHoursOver.toFixed(1)} hrs overtime</strong>` : '<strong style="color:#15803D;">Regular straight-time</strong>'}
+                </div>
+              </div>
+
+              <!-- Partner / Releasing User Box (if applicable) -->
+              ${partnerUser ? `
+                <div class="approval-user-box">
+                  <div class="approval-user-box-top">
+                    <div class="approval-user-info">
+                      <span class="user-circle ${(partnerUser.initials || 'sr').toLowerCase()}" style="width:24px;height:24px;font-size:0.65rem;">${partnerUser.initials}</span>
+                      <div>
+                        <div class="approval-user-name">${partnerUser.name}</div>
+                        <div class="approval-user-role">${app.actionType === 'Swap' ? 'Swap Partner' : 'Releasing Staff'} &bull; ${partnerEmpBadge}</div>
+                      </div>
+                    </div>
+                    <span class="approval-ot-badge safe">🟢 Safe (-${shiftHours.toFixed(1)}h relief)</span>
+                  </div>
+
+                  <div class="approval-metrics-row">
+                    <div class="approval-metric-item">
+                      <span class="approval-metric-label">Currently Scheduled</span>
+                      <span class="approval-metric-val">${partnerCurrentHours.toFixed(1)} hrs</span>
+                    </div>
+                    <div class="approval-metric-item">
+                      <span class="approval-metric-label">Shift Impact</span>
+                      <span class="approval-metric-val" style="color:#166534;">-${shiftHours.toFixed(1)} hrs</span>
+                    </div>
+                    <div class="approval-metric-item">
+                      <span class="approval-metric-label">Projected Total</span>
+                      <span class="approval-metric-val proj-safe">${partnerProjectedHours.toFixed(1)} hrs</span>
+                    </div>
+                  </div>
+
+                  <div style="font-size:0.75rem; color:var(--text-muted);">
+                    Limit: <strong>${partnerThreshold.toFixed(0)} hrs/week</strong> &bull; Status: <strong style="color:#15803D;">Relieved of shift</strong>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="approval-impact-summary">
+              ${impactSummaryText}
+            </div>
           </div>
         `;
         list.appendChild(card);
@@ -3338,26 +3711,76 @@
     const tbody = document.getElementById('auditTrailTableBody');
     if (!tbody) return;
 
+    const isMgr = isManagerUser();
+    const currentUser = getCurrentUser();
+
+    // Adapt View Header & Subheadings
+    const headingEl = document.getElementById('auditViewHeading');
+    const subheadEl = document.getElementById('auditViewSubheading');
+    const tableTitleEl = document.getElementById('auditTableTitle');
+    const tableSubEl = document.getElementById('auditTableSub');
+    const mgrComplianceGrid = document.getElementById('managerComplianceGrid');
+    const empNotificationGrid = document.getElementById('employeeNotificationGrid');
+
+    if (isMgr) {
+      if (headingEl) headingEl.textContent = 'Labor Compliance & Audit Log';
+      if (subheadEl) subheadEl.textContent = 'Tamper-evident logs of schedule publications, coverage authorizations, station qualification checks, and FLSA tip-credit compliance.';
+      if (tableTitleEl) tableTitleEl.textContent = 'Verified Schedule & Coverage Audit Trail';
+      if (tableSubEl) tableSubEl.textContent = 'Permanent record of schedule publications and manager-approved shift coverage reassignments';
+      if (mgrComplianceGrid) mgrComplianceGrid.style.display = 'grid';
+      if (empNotificationGrid) empNotificationGrid.style.display = 'none';
+    } else {
+      if (headingEl) headingEl.textContent = 'My Activity & Audit Log';
+      if (subheadEl) subheadEl.textContent = 'Official record and notifications of your shift coverage requests, swap proposals, and manager approvals.';
+      if (tableTitleEl) tableTitleEl.textContent = 'My Shift Activity & Notifications';
+      if (tableSubEl) tableSubEl.textContent = 'Live notifications for your submitted requests, peer swaps, and manager approvals';
+      if (mgrComplianceGrid) mgrComplianceGrid.style.display = 'none';
+      if (empNotificationGrid) empNotificationGrid.style.display = 'grid';
+    }
+
     tbody.innerHTML = '';
 
-    if (!state.auditLog || state.auditLog.length === 0) {
+    // Filter logs for employee if not manager
+    let logsToDisplay = state.auditLog || [];
+    if (!isMgr && currentUser) {
+      logsToDisplay = logsToDisplay.filter(log => {
+        if (log.userId && log.userId === currentUser.id) return true;
+        if (log.targetUserId && log.targetUserId === currentUser.id) return true;
+        if (currentUser.name && log.details && log.details.includes(currentUser.name)) return true;
+        return false;
+      });
+
+      // Update employee summary cards
+      const approvedCount = logsToDisplay.filter(l => l.status === 'APPROVED').length;
+      const pendingCount = logsToDisplay.filter(l => l.status === 'SUBMITTED' || l.status === 'PROPOSED' || l.status === 'POSTED').length;
+
+      const empApprEl = document.getElementById('empAuditApprovedCount');
+      if (empApprEl) empApprEl.textContent = `${approvedCount} APPROVED`;
+      const empPendEl = document.getElementById('empAuditPendingCount');
+      if (empPendEl) empPendEl.textContent = `${pendingCount} PENDING`;
+    }
+
+    if (logsToDisplay.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-            No audit log entries recorded yet.
+          <td colspan="4" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+            ${isMgr 
+              ? 'No audit log entries recorded yet.' 
+              : 'No activity or notifications recorded for your account yet. When you submit shift claims, propose swaps, or receive manager approvals, they will appear here in real time.'}
           </td>
         </tr>
       `;
       return;
     }
 
-    state.auditLog.forEach(log => {
+    logsToDisplay.forEach(log => {
       const tr = document.createElement('tr');
       let statusPillClass = 'covered';
-      if (log.status === 'PUBLISHED') statusPillClass = 'safe';
-      if (log.status === 'APPROVED') statusPillClass = 'swapped';
-      if (log.status === 'DECLINED') statusPillClass = 'pending';
-      if (log.status === 'POSTED') statusPillClass = 'up-for-grabs';
+      if (log.status === 'PUBLISHED' || log.status === 'APPROVED') statusPillClass = 'approved';
+      else if (log.status === 'SUBMITTED' || log.status === 'PROPOSED') statusPillClass = 'submitted';
+      else if (log.status === 'POSTED') statusPillClass = 'up-for-grabs';
+      else if (log.status === 'DECLINED') statusPillClass = 'declined';
+      else if (log.status === 'UPDATED' || log.status === 'CREATED') statusPillClass = 'swapped';
 
       tr.innerHTML = `
         <td class="font-mono" style="font-size:0.8rem; color:var(--text-muted);">${log.timestamp}</td>
@@ -3579,12 +4002,13 @@
     'view-overview': 'Overview',
     'view-shifts': 'Shift board',
     'view-tips': 'Cash tips',
-    'view-approvals': 'My requests'
+    'view-approvals': 'My requests',
+    'view-audit': 'Audit log'
   };
 
   function switchView(viewId) {
     const isMgr = isManagerUser();
-    const managerOnlyViews = ['view-access', 'view-roster', 'view-audit'];
+    const managerOnlyViews = ['view-access', 'view-roster'];
     if (!isMgr && managerOnlyViews.includes(viewId)) {
       showToast('Manager credentials required to access this workspace.', 'error');
       viewId = 'view-overview';
@@ -3810,13 +4234,14 @@
       renderShiftBoardView();
     });
 
-    // Schedule Status Filter Chips (All, My Shifts, Up for Grabs, Swapped)
+    // Schedule Status Filter Chips (All, My Shifts, Up for Grabs, Swapped, Overtime)
     document.querySelector('.filter-chips-group')?.addEventListener('click', (e) => {
       const chip = e.target.closest('.sched-filter-chip');
       if (!chip) return;
       document.querySelectorAll('.sched-filter-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       state.scheduleFilter = chip.getAttribute('data-sched-filter') || 'all';
+      state.scheduleFilterUser = null;
       renderShiftBoardView();
     });
 
@@ -3968,11 +4393,13 @@
 
       state.auditLog.unshift({
         id: 'audit-' + Date.now(),
+        userId: user.id,
+        targetUserId: targetUser.id,
         timestamp: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         action: 'Shift Swap Proposed',
-        details: `${user.name} proposed trade with ${targetUser.name} on ${shift.scheduleDate} (${shift.role}).`,
+        details: `${user.name} proposed trade with ${targetUser.name} on ${shift.scheduleDate} (${shift.role}). Awaiting manager review.`,
         type: 'coverage',
-        status: 'PROPOSED'
+        status: 'SUBMITTED'
       });
 
       saveState();
@@ -3984,6 +4411,22 @@
 
     // Global Click Delegation
     document.addEventListener('click', (e) => {
+      // Master Schedule: Team Hours Tracker Card Click to Filter by User
+      const trackerCard = e.target.closest('[data-action="filter-schedule-user"]');
+      if (trackerCard) {
+        const uId = trackerCard.getAttribute('data-user-id');
+        if (state.scheduleFilterUser === uId) {
+          state.scheduleFilterUser = null;
+          showToast('Cleared staff schedule filter.', 'info');
+        } else {
+          state.scheduleFilterUser = uId;
+          const u = getUserById(uId);
+          showToast(`Filtered schedule for ${u ? u.name : 'staff member'} (${u ? u.weeklyHours : 0}h scheduled). Click card again to view all.`, 'info');
+        }
+        renderShiftBoardView();
+        return;
+      }
+
       // KPI Card Navigation
       const kpiCard = e.target.closest('.kpi-card');
       if (kpiCard) {

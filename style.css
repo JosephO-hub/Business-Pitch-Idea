@@ -1055,10 +1055,24 @@ body.app-body {
   color: #475569;
 }
 
-.status-pill.safe, .status-pill.covered {
+.status-pill.safe, .status-pill.covered, .status-pill.approved {
   background: var(--color-mint-light);
   border: 1px solid var(--color-mint-border);
   color: var(--color-mint-dark);
+}
+
+.status-pill.submitted {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
+  font-weight: 700;
+}
+
+.status-pill.declined {
+  background: #FEE2E2;
+  border: 1px solid #FECACA;
+  color: #DC2626;
+  font-weight: 700;
 }
 
 .status-pill.pending {
@@ -2156,15 +2170,400 @@ body.app-body {
 }
 
 .approval-card-item {
-  background: #F9FAFB;
+  background: #FFFFFF;
   border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.approval-card-item:hover {
+  border-color: #CBD5E1;
+  box-shadow: var(--shadow-card);
+}
+
+.approval-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+/* Approvals Overtime Impact Analysis Box */
+.approval-impact-card {
+  background: #F8FAF9;
+  border: 1px solid #E2E8F0;
   border-radius: var(--radius-md);
-  padding: 1.25rem;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.approval-impact-card.has-ot {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+}
+
+.approval-impact-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1.5rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.approval-impact-header .impact-tag {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.approval-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.approval-user-box {
+  background: #FFFFFF;
+  border: 1px solid #E5E9E5;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.approval-user-box.ot-alert {
+  border-color: #FCD34D;
+  background: #FFFEF5;
+}
+
+.approval-user-box-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-user-name {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+}
+
+.approval-user-role {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.approval-metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px dashed #E2E8F0;
+  border-bottom: 1px dashed #E2E8F0;
+  font-size: 0.75rem;
+}
+
+.approval-metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-metric-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.approval-metric-val {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.approval-metric-val.proj-safe {
+  color: #15803D;
+}
+
+.approval-metric-val.proj-ot {
+  color: #B45309;
+}
+
+.approval-ot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.approval-ot-badge.safe {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+}
+
+.approval-ot-badge.ot-risk {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.approval-impact-summary {
+  font-size: 0.78rem;
+  color: var(--text-body);
+  line-height: 1.4;
+  margin-top: 0.15rem;
+}
+
+/* Master Schedule Team Hours & Overtime Watch Panel */
+.team-hours-tracker-panel {
+  background: #F8FAF9;
+  border-bottom: 1px solid var(--border-light);
+  padding: 1.25rem 1.5rem;
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tracker-header-left .tracker-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  margin: 0.25rem 0 0.15rem;
+}
+
+.tracker-header-left .tracker-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.tracker-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.tracker-metric-pill {
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  color: var(--text-dark);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tracker-metric-pill.ot-count {
+  background: #FEF3C7;
+  border-color: #FDE68A;
+  color: #92400E;
+}
+
+.team-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.team-member-hours-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.team-member-hours-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+  border-color: #CBD5E1;
+}
+
+.team-member-hours-card.active-filtered {
+  border-color: var(--color-forest);
+  background: #F0FDF4;
+}
+
+.team-member-hours-card.has-ot {
+  border-color: #FCD34D;
+  background: #FFFDF5;
+}
+
+.card-member-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.card-member-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-member-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.card-member-role {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.card-hours-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.card-hours-big {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.card-hours-big.ot {
+  color: #B45309;
+}
+
+.card-hours-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.card-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.card-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.card-progress-fill.safe {
+  background: #10B981;
+}
+
+.card-progress-fill.warning {
+  background: #F59E0B;
+}
+
+.card-progress-fill.danger {
+  background: #EF4444;
+}
+
+.card-status-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+}
+
+.hours-status-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-pill);
+}
+
+.hours-status-pill.safe {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.hours-status-pill.limit {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.hours-status-pill.ot {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+/* Master Schedule Table Staff Hours Pill */
+.staff-scheduled-hours-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  margin-top: 0.3rem;
+  border: 1px solid #E2E8F0;
+  background: #F8FAF9;
+  color: var(--text-dark);
+}
+
+.staff-scheduled-hours-pill.safe {
+  border-color: #BBF7D0;
+  background: #F0FDF4;
+  color: #166534;
+}
+
+.staff-scheduled-hours-pill.at-limit {
+  border-color: #FDE68A;
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.staff-scheduled-hours-pill.ot-alert {
+  border-color: #FECACA;
+  background: #FEF2F2;
+  color: #991B1B;
+  font-weight: 700;
 }
 
 .audit-grid {

@@ -318,6 +318,19 @@
 
           <!-- Master Schedule Card -->
           <div class="content-card" id="masterScheduleCard">
+            <!-- Manager-Only Team Scheduled Hours & Overtime Tracker -->
+            <div class="team-hours-tracker-panel" id="teamHoursTrackerPanel" style="display: none;">
+              <div class="tracker-header">
+                <div class="tracker-header-left">
+                  <span class="sub-badge">STAFF WORK HOURS &amp; OVERTIME WATCH</span>
+                  <h3 class="tracker-title">Team Scheduled Hours vs. Overtime Limits</h3>
+                  <p class="tracker-subtitle">Monitor each employee's total scheduled hours in the active schedule. Prevents scheduling staff into overtime (40h Full-Time / 32h Part-Time).</p>
+                </div>
+                <div class="tracker-header-right" id="teamHoursSummaryMetrics"></div>
+              </div>
+              <div class="team-hours-grid" id="teamHoursGrid"></div>
+            </div>
+
             <div class="schedule-filter-bar">
               <div class="filter-chips-group">
                 <button type="button" class="sched-filter-chip active" data-sched-filter="all">
@@ -331,6 +344,9 @@
                 </button>
                 <button type="button" class="sched-filter-chip" data-sched-filter="swapped">
                   Covered / Swapped (<span id="schedCountSwapped">0</span>)
+                </button>
+                <button type="button" class="sched-filter-chip" data-sched-filter="overtime" id="filterChipOt" style="display: none;">
+                  ⚠️ Overtime Risk (<span id="schedCountOt">0</span>)
                 </button>
               </div>
 
@@ -708,12 +724,13 @@
         <section class="view-panel" id="view-audit">
           <div class="panel-section-header">
             <div>
-              <h2 class="view-heading">Labor Compliance &amp; Audit Log</h2>
-              <p class="view-subheading">Tamper-evident logs of schedule publications, coverage authorizations, station qualification checks, and FLSA tip-credit compliance.</p>
+              <h2 class="view-heading" id="auditViewHeading">Labor Compliance &amp; Audit Log</h2>
+              <p class="view-subheading" id="auditViewSubheading">Tamper-evident logs of schedule publications, coverage authorizations, station qualification checks, and FLSA tip-credit compliance.</p>
             </div>
           </div>
 
-          <div class="audit-grid">
+          <!-- Manager Compliance Grid (Hidden for Employees) -->
+          <div class="audit-grid" id="managerComplianceGrid">
             <div class="audit-card">
               <div class="audit-card-icon">🛡️</div>
               <div class="audit-card-title">FLSA 29 U.S.C. § 203(m)(2)(B) Check</div>
@@ -734,12 +751,34 @@
             </div>
           </div>
 
+          <!-- Employee Notification & Activity Grid (Visible for Employees only) -->
+          <div class="audit-grid" id="employeeNotificationGrid" style="display: none;">
+            <div class="audit-card">
+              <div class="audit-card-icon">✅</div>
+              <div class="audit-card-title">Approved Requests</div>
+              <div class="audit-status passed" id="empAuditApprovedCount">0 APPROVED</div>
+              <p class="audit-desc">Shifts, coverage offers, and swap proposals approved by management.</p>
+            </div>
+            <div class="audit-card">
+              <div class="audit-card-icon">📨</div>
+              <div class="audit-card-title">Submitted &amp; Pending</div>
+              <div class="audit-status active" id="empAuditPendingCount">0 PENDING</div>
+              <p class="audit-desc">Shift claims, coverage offers, and swap requests awaiting review.</p>
+            </div>
+            <div class="audit-card">
+              <div class="audit-card-icon">🔔</div>
+              <div class="audit-card-title">Notification Status</div>
+              <div class="audit-status passed">ACTIVE &amp; SYNCED</div>
+              <p class="audit-desc">Live audit trail updates automatically when you submit requests or a manager approves them.</p>
+            </div>
+          </div>
+
           <!-- Verified Schedule & Coverage Audit Trail Card -->
           <div class="content-card" style="margin-top: 1.5rem;">
             <div class="content-card-header">
               <div>
-                <h3 class="card-main-title">Verified Schedule &amp; Coverage Audit Trail</h3>
-                <p class="card-main-sub">Permanent record of schedule publications and manager-approved shift coverage reassignments</p>
+                <h3 class="card-main-title" id="auditTableTitle">Verified Schedule &amp; Coverage Audit Trail</h3>
+                <p class="card-main-sub" id="auditTableSub">Permanent record of schedule publications and manager-approved shift coverage reassignments</p>
               </div>
               <span class="sync-badge"><span class="sync-dot"></span> Live Log</span>
             </div>

@@ -10,7 +10,7 @@ Built in strict compliance with the [`shift-tip-standards`](.agents/skills/shift
 
 ### 🍽️ The Employee Perspective
 Employees sign in with their unique 4-digit PIN (e.g., Jordan Ellis: `2222`, Joseph: `6666`, Maya Chen: `1111`) to access a dedicated, streamlined interface:
-- **Tailored Navigation:** Shows **Overview**, **Shift board**, **Cash tips**, and **My requests**.
+- **Tailored Navigation:** Shows **Overview**, **Shift board**, **Cash tips**, **My requests**, and **Audit log**.
 - **Overview Dashboard:**
   - Hero card: *"Pick up open shifts, request coverage, and record your pooled cash tips."* with **[📅 Browse open shifts]** button.
   - 4 employee KPIs: *Claimable shifts*, *My assigned shifts*, *My open requests*, and *My pooled cash tips*.
@@ -26,6 +26,15 @@ Employees sign in with their unique 4-digit PIN (e.g., Jordan Ellis: `2222`, Jos
 - **My Requests:**
   - Tracks all pending claims and trade proposals with live status: `Awaiting manager review`.
   - Allows withdrawing pending requests before review.
+- **Employee Audit Log & Notification Feed:**
+  - Dedicated personal audit log tab in the employee navigation.
+  - Displays instant notifications for the 4 core shift events:
+    1. **Manager Approvals:** When a manager authorizes a shift claim, coverage request, or swap proposal.
+    2. **Coverage Requests Submitted:** When an employee submits an offer to cover a colleague's shift placed Up for Grabs.
+    3. **Swap Proposals Submitted:** When an employee submits a trade proposal to swap shifts with a coworker.
+    4. **Open Shift Claims Accepted / Approved:** When a manager accepts and officially assigns an open shift to the employee.
+  - Shows clear status pills (`APPROVED`, `SUBMITTED`, `POSTED`, `DECLINED`) and summary metric cards (*Approved Requests*, *Submitted & Pending*, *Active Notification Sync*).
+  - Strict privacy guardrail: Employees only see their own personal logs and notifications (coworkers' activity and manager compliance cards remain completely hidden).
 - **Personal Cash Tips & Payout Privacy:**
   - **Restricted Manager Panels:** "Enter Shift Tip Receipts" and "Role Weight Multipliers" are strictly hidden from employees.
   - **Privacy-Guarded Breakdown:** Non-manager employees see only their personal earnings breakdown (hours, role, cash share, payroll credit card share, and total payout). Coworkers' names, hours, and tip amounts are completely hidden.
@@ -37,14 +46,14 @@ Managers sign in with manager credentials (e.g., Ava Morgan: `5678` or Paul Para
   - **Starter Template Auto-Population:** One-click generation of balanced restaurant shifts (Dinner service, Lunch turnover, Bar close, Kitchen prep, Floor lead) across qualified staff with sample open and up-for-grabs shifts.
   - **Manual Shift Creation & Editing:** Add custom shifts with specific date, service name, station role, hours, assigned staff member, and notes. Edit or delete existing shifts.
   - **Single Source of Truth:** All shifts save directly into the unified schedule array in local browser storage, syncing immediately with the swap queue and tip pool.
-- **Manager Approvals Queue:**
-  - Review submitted claims and swap proposals.
-  - Click **"Authorize"** or **"Dismiss"**.
-  - Upon authorization:
-    - Automatically updates the assigned worker in the master schedule.
-    - Decorates the shift with a subtle `🔄 Covered / Swapped` status badge.
-    - Permanently records the authorization in the verified audit log.
-    - Instantly recalculates shift hours and tip-pool shares to the exact cent.
+- **Manager Approvals Queue & Live Overtime Projection:**
+  - **Individual Scheduled Hours Visibility:** For every pending shift claim or swap proposal, the manager can see the exact currently scheduled work hours for each user involved (claimant, releasing staff, and swap partner).
+  - **Live Overtime Impact Analysis:** Calculates what approving the request would do to each user's scheduled weekly hours. Shows projected weekly totals and overtime alerts whenever hours exceed weekly FLSA limits (40.0h Full-Time / 32.0h Part-Time).
+  - **One-Click Authorization with Overtime Warnings:** Prominently flags overtime risk (`⚠️ Overtime Alert: +X.X hrs Overtime at 1.5x pay`) so managers avoid accidental overtime expenses before authorizing shift changes.
+- **Master Schedule — Team Scheduled Hours & Overtime Prevention:**
+  - **Team Work Hours & Overtime Watch Panel:** Positioned at the top of the Master Schedule for managers, displaying live scheduled hours, shift counts, threshold progress bars, and remaining buffers for all 8 team members.
+  - **In-Table Scheduled Hours Badges:** Each assigned shift row in the schedule table displays the employee's current weekly work hours and overtime status (e.g. `⏱️ 36.0h scheduled • 4.0h buffer` or `⏱️ 42.0h scheduled • ⚠️ +2.0h Overtime`).
+  - **Interactive Staff Filter & Overtime Risk Chip:** Click any employee's tracker card or the `⚠️ Overtime Risk` filter chip to isolate relevant shifts instantly.
 - **Coverage Validation Engine:**
   - Click **"Validate"** on any scheduled shift to evaluate off-duty employees against station certifications and straight-time wage policies.
 - **Bi-Weekly Tip-Pool Allocation Engine:**
