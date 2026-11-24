@@ -568,7 +568,7 @@
           <div class="panel-section-header">
             <div>
               <h2 class="view-heading">Synthetic Restaurant Roster</h2>
-              <p class="view-subheading">Baseline staff records with hourly wages, station certifications, and current weekly hours logged. Notice Maya Lin (37.0h) &amp; Marcus Vance (36.5h) primed for overtime warnings.</p>
+              <p class="view-subheading">Baseline staff records with hourly wages, station certifications, employment types (32h Part-Time vs. 40h Full-Time), and weekly hours logged. Notice Maya Chen (Part-Time, 29.0h) &amp; Sofia Reyes (Full-Time, 36.0h) primed for overtime warnings.</p>
             </div>
           </div>
 
@@ -737,6 +737,13 @@
               <option value="Employee">Employee</option>
               <option value="Manager">Manager</option>
               <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="newMemberEmploymentType">Employment Status</label>
+            <select id="newMemberEmploymentType" class="access-role-select" style="width:100%; height:42px;">
+              <option value="full-time">Full-Time (40 hrs/wk max)</option>
+              <option value="part-time">Part-Time (32 hrs/wk max)</option>
             </select>
           </div>
           <div class="form-group">
@@ -941,9 +948,9 @@
         <div style="display:flex; align-items:center; gap:0.5rem;">
           <span style="font-size:1.3rem;">⚠️</span>
           <div>
-            <h3 class="modal-title" style="color:#92400E;">Overtime Warning Confirmation</h3>
-            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1px;">
-              Manager authorization required for shift changes exceeding 40.0 weekly hours
+            <h3 class="modal-title" style="color:#92400E;" id="otApprovalModalTitle">Overtime Warning Confirmation</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1px;" id="otApprovalModalSubtitle">
+              Manager authorization required for shift changes exceeding straight-time weekly thresholds (32.0h Part-Time / 40.0h Full-Time)
             </p>
           </div>
         </div>

@@ -23,6 +23,7 @@
       id: 'usr-1',
       name: 'Paul Parajuli',
       role: 'Admin',
+      employmentType: 'full-time',
       pin: '1234',
       initials: 'PP',
       isPrimaryAdmin: true,
@@ -34,16 +35,18 @@
       id: 'usr-2',
       name: 'Maya Chen',
       role: 'Employee',
+      employmentType: 'part-time',
       pin: '1111',
       initials: 'MC',
       certifications: ['Server', 'Bartender'],
       hourlyRate: 12.50,
-      weeklyHours: 36.0
+      weeklyHours: 29.0
     },
     {
       id: 'usr-3',
       name: 'Jordan Ellis',
       role: 'Employee',
+      employmentType: 'part-time',
       pin: '2222',
       initials: 'JE',
       certifications: ['Bartender', 'Server'],
@@ -54,16 +57,18 @@
       id: 'usr-4',
       name: 'Sofia Reyes',
       role: 'Employee',
+      employmentType: 'full-time',
       pin: '3333',
       initials: 'SR',
       certifications: ['Bartender'],
       hourlyRate: 15.00,
-      weeklyHours: 30.0
+      weeklyHours: 36.0
     },
     {
       id: 'usr-5',
       name: 'Eli Brooks',
       role: 'Employee',
+      employmentType: 'part-time',
       pin: '4444',
       initials: 'EB',
       certifications: ['Busser', 'Server'],
@@ -74,6 +79,7 @@
       id: 'usr-6',
       name: 'Noah Patel',
       role: 'Employee',
+      employmentType: 'full-time',
       pin: '5555',
       initials: 'NP',
       certifications: ['Line cook'],
@@ -84,6 +90,7 @@
       id: 'usr-7',
       name: 'Ava Morgan',
       role: 'Manager',
+      employmentType: 'full-time',
       pin: '5678',
       initials: 'AM',
       certifications: ['Shift Lead', 'Server', 'Bartender'],
@@ -94,6 +101,7 @@
       id: 'usr-8',
       name: 'Joseph',
       role: 'Employee',
+      employmentType: 'part-time',
       pin: '6666',
       initials: 'JO',
       certifications: ['Server', 'Bartender', 'Host'],
@@ -134,6 +142,91 @@
   }
 
   // =========================================================================
+  // Workweek (Sunday–Saturday) & Overtime Threshold Calculations
+  // =========================================================================
+
+  function getWorkweekBounds(dateIso) {
+    if (!dateIso) return null;
+    const [y, m, d] = dateIso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const dayOfWeek = dt.getDay(); // 0 = Sunday, 6 = Saturday
+    const sunday = new Date(y, m - 1, d - dayOfWeek);
+    const saturday = new Date(y, m - 1, d + (6 - dayOfWeek));
+    return {
+      startIso: formatDateIso(sunday),
+      endIso: formatDateIso(saturday),
+      sundayDate: sunday,
+      saturdayDate: saturday,
+      label: `${formatDateDisplay(sunday)} \u2013 ${formatDateDisplay(saturday)}`
+    };
+  }
+
+  function getEmployeeWeeklyThreshold(userOrId) {
+    const user = typeof userOrId === 'string' ? getUserById(userOrId) : userOrId;
+    if (!user) return 40.0;
+    return user.employmentType === 'part-time' ? 32.0 : 40.0;
+  }
+
+  function getEmployeeHoursForWeek(userId, dateIso, excludeShiftId = null) {
+    const user = getUserById(userId);
+    if (!user) return 0;
+
+    if (dateIso) {
+      const bounds = getWorkweekBounds(dateIso);
+      let total = 0;
+      let count = 0;
+      state.shifts.forEach(s => {
+        if (s.userId === userId && s.id !== excludeShiftId) {
+          if (s.dateIso >= bounds.startIso && s.dateIso <= bounds.endIso) {
+            total += getShiftActualHours(s);
+            count++;
+          }
+        }
+      });
+
+      // If evaluating Week 1 (Nov 15–21) in baseline demo and user already has established hours:
+      if (bounds.startIso === '2026-11-15' && user.weeklyHours > 0) {
+        return user.weeklyHours;
+      }
+
+      if (count > 0 || total > 0) {
+        return parseFloat(total.toFixed(1));
+      }
+    }
+
+    return user.weeklyHours || 0;
+  }
+
+  function checkEmployeeOvertime(userId, dateIso, addedHours = 0, excludeShiftId = null) {
+    const user = getUserById(userId);
+    if (!user) return null;
+
+    const employmentType = user.employmentType === 'part-time' ? 'part-time' : 'full-time';
+    const threshold = employmentType === 'part-time' ? 32.0 : 40.0;
+    const currentWeeklyHours = getEmployeeHoursForWeek(userId, dateIso, excludeShiftId);
+    const newWeeklyTotal = parseFloat((currentWeeklyHours + addedHours).toFixed(1));
+    const isOvertime = newWeeklyTotal > threshold;
+    const hoursOver = isOvertime ? parseFloat((newWeeklyTotal - threshold).toFixed(1)) : 0;
+    const bounds = getWorkweekBounds(dateIso);
+
+    return {
+      user,
+      employmentType,
+      typeLabel: employmentType === 'part-time' ? 'Part-Time' : 'Full-Time',
+      threshold,
+      currentWeeklyHours,
+      addedHours,
+      newWeeklyTotal,
+      isOvertime,
+      hoursOver,
+      weekLabel: bounds ? bounds.label : 'Current Workweek',
+      badgeText: isOvertime
+        ? `OT Risk (+${hoursOver.toFixed(1)} hrs over ${threshold.toFixed(0)}h ${employmentType === 'part-time' ? 'PT' : 'FT'} limit)`
+        : null
+    };
+  }
+
+  // =========================================================================
   // Schedule Generator Engine (Bi-Weekly & Monthly Starter Templates)
   // =========================================================================
 
@@ -149,44 +242,63 @@
         { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Main Dining Room', user: null, status: 'Open', statusClass: 'open' },
         { role: 'Bartender', service: 'Bar close', start: '5:00 PM', end: '11:00 PM', hours: 6.0, notes: 'Craft Bar', user: 'usr-4', status: 'Covered', statusClass: 'covered' },
         { role: 'Line cook', service: 'Evening prep', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Hot Line', user: 'usr-6', status: 'Covered', statusClass: 'covered' },
-        { role: 'Shift Lead', service: 'Dinner service', start: '4:00 PM', end: '12:00 AM', hours: 8.0, notes: 'Floor Lead', user: 'usr-7', status: 'Covered', statusClass: 'covered' }
+        { role: 'Shift Lead', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Floor Lead', user: 'usr-7', status: 'Covered', statusClass: 'covered' },
+        { role: 'General Manager', service: 'Floor oversight', start: '10:00 AM', end: '6:00 PM', hours: 8.0, notes: 'Operations & Management', user: 'usr-1', status: 'Covered', statusClass: 'covered' }
       ],
       // Day pattern 1 (Saturday)
       [
         { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Dining Room', user: 'usr-2', status: 'Covered', statusClass: 'covered' },
         { role: 'Bartender', service: 'Bar close', start: '5:00 PM', end: '11:00 PM', hours: 6.0, notes: 'Craft Bar & Lounge', user: 'usr-3', status: 'Up for Grabs', statusClass: 'up-for-grabs' },
-        { role: 'Host', service: 'Lunch service', start: '10:00 AM', end: '3:00 PM', hours: 5.0, notes: 'Front Door', user: 'usr-8', status: 'Covered', statusClass: 'covered' },
-        { role: 'Line cook', service: 'Kitchen prep', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Sautee Station', user: 'usr-6', status: 'Covered', statusClass: 'covered' }
+        { role: 'Host', service: 'Lunch service', start: '10:00 AM', end: '4:00 PM', hours: 6.0, notes: 'Front Door', user: 'usr-8', status: 'Covered', statusClass: 'covered' },
+        { role: 'Line cook', service: 'Kitchen prep', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Sautee Station', user: 'usr-6', status: 'Covered', statusClass: 'covered' },
+        { role: 'Busser', service: 'Evening busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Floor Support', user: 'usr-5', status: 'Covered', statusClass: 'covered' }
       ],
       // Day pattern 2 (Sunday)
       [
-        { role: 'Host', service: 'Brunch service', start: '10:00 AM', end: '3:00 PM', hours: 5.0, notes: 'Entrance & Reservations', user: null, status: 'Open', statusClass: 'open' },
+        { role: 'Host', service: 'Brunch service', start: '10:00 AM', end: '4:00 PM', hours: 6.0, notes: 'Entrance & Reservations', user: 'usr-8', status: 'Covered', statusClass: 'covered' },
         { role: 'Server', service: 'Patio service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Patio & Section 2', user: 'usr-2', status: 'Covered', statusClass: 'covered' },
-        { role: 'Bartender', service: 'Main bar', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Bar Section', user: 'usr-4', status: 'Covered', statusClass: 'covered' }
+        { role: 'Bartender', service: 'Main bar', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Bar Section', user: 'usr-4', status: 'Covered', statusClass: 'covered' },
+        { role: 'Line cook', service: 'Line service', start: '11:00 AM', end: '5:00 PM', hours: 6.0, notes: 'Kitchen Hot Line', user: 'usr-6', status: 'Covered', statusClass: 'covered' },
+        { role: 'General Manager', service: 'Sunday management', start: '9:00 AM', end: '5:00 PM', hours: 8.0, notes: 'Admin & Inventory', user: 'usr-1', status: 'Covered', statusClass: 'covered' },
+        { role: 'Shift Lead', service: 'Sunday lead', start: '3:00 PM', end: '11:00 PM', hours: 8.0, notes: 'Closeout Lead', user: 'usr-7', status: 'Covered', statusClass: 'covered' }
       ],
       // Day pattern 3 (Monday - includes Swapped shift demonstration)
       [
         { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Dining Room', user: 'usr-2', status: 'Covered', statusClass: 'swapped', isSwapped: true, swappedFrom: 'Jordan Ellis', swapApprovedAt: 'Nov 20, 2026, 02:30 PM' },
         { role: 'Line cook', service: 'Evening prep', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Hot Line & Sautee', user: 'usr-6', status: 'Covered', statusClass: 'covered' },
-        { role: 'Busser', service: 'Evening busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Floor Support', user: 'usr-5', status: 'Covered', statusClass: 'covered' }
+        { role: 'Busser', service: 'Evening busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Floor Support', user: 'usr-5', status: 'Covered', statusClass: 'covered' },
+        { role: 'Bartender', service: 'Main bar', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Lounge Service', user: 'usr-4', status: 'Covered', statusClass: 'covered' },
+        { role: 'General Manager', service: 'Floor oversight', start: '10:00 AM', end: '6:00 PM', hours: 8.0, notes: 'Weekly Scheduling', user: 'usr-1', status: 'Covered', statusClass: 'covered' },
+        { role: 'Server', service: 'Lunch turnover', start: '11:00 AM', end: '5:00 PM', hours: 6.0, notes: 'Section 1', user: 'usr-3', status: 'Covered', statusClass: 'covered' }
       ],
       // Day pattern 4 (Tuesday)
       [
         { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Section 1', user: 'usr-3', status: 'Covered', statusClass: 'covered' },
         { role: 'Bartender', service: 'Bar service', start: '4:30 PM', end: '10:30 PM', hours: 6.0, notes: 'Lounge Bar', user: 'usr-4', status: 'Covered', statusClass: 'covered' },
-        { role: 'Host', service: 'Dinner host', start: '4:00 PM', end: '9:00 PM', hours: 5.0, notes: 'Host Stand', user: 'usr-8', status: 'Covered', statusClass: 'covered' }
+        { role: 'Host', service: 'Dinner host', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Host Stand', user: 'usr-8', status: 'Covered', statusClass: 'covered' },
+        { role: 'Busser', service: 'Evening busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Dining Support', user: 'usr-5', status: 'Covered', statusClass: 'covered' },
+        { role: 'General Manager', service: 'Admin oversight', start: '10:00 AM', end: '6:00 PM', hours: 8.0, notes: 'Office & Payroll', user: 'usr-1', status: 'Covered', statusClass: 'covered' },
+        { role: 'Shift Lead', service: 'Floor lead', start: '4:00 PM', end: '11:00 PM', hours: 7.0, notes: 'Shift Supervision', user: 'usr-7', status: 'Covered', statusClass: 'covered' }
       ],
       // Day pattern 5 (Wednesday)
       [
-        { role: 'Server', service: 'Dinner turnover', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Main Floor', user: 'usr-5', status: 'Covered', statusClass: 'covered' },
+        { role: 'Server', service: 'Dinner turnover', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Main Floor', user: 'usr-2', status: 'Covered', statusClass: 'covered' },
         { role: 'Line cook', service: 'Line service', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Kitchen Sautee', user: 'usr-6', status: 'Covered', statusClass: 'covered' },
-        { role: 'Shift Lead', service: 'Floor lead', start: '4:00 PM', end: '11:00 PM', hours: 7.0, notes: 'Floor Management', user: 'usr-7', status: 'Covered', statusClass: 'covered' }
+        { role: 'Shift Lead', service: 'Floor lead', start: '4:00 PM', end: '11:00 PM', hours: 7.0, notes: 'Floor Management', user: 'usr-7', status: 'Covered', statusClass: 'covered' },
+        { role: 'Bartender', service: 'Mid-week bar', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Craft Counter', user: 'usr-4', status: 'Covered', statusClass: 'covered' },
+        { role: 'Busser', service: 'Evening busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Floor Clearing', user: 'usr-5', status: 'Covered', statusClass: 'covered' },
+        { role: 'Host', service: 'Evening host', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Front Desk', user: 'usr-8', status: 'Covered', statusClass: 'covered' },
+        { role: 'Server', service: 'Patio support', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Patio Station', user: 'usr-3', status: 'Covered', statusClass: 'covered' }
       ],
       // Day pattern 6 (Thursday)
       [
         { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Dining Room', user: 'usr-2', status: 'Covered', statusClass: 'covered' },
-        { role: 'Bartender', service: 'Bar turnover', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Main Bar', user: 'usr-3', status: 'Covered', statusClass: 'covered' },
-        { role: 'Host', service: 'Evening host', start: '4:30 PM', end: '9:30 PM', hours: 5.0, notes: 'Front Desk', user: 'usr-8', status: 'Covered', statusClass: 'covered' }
+        { role: 'Bartender', service: 'Bar turnover', start: '3:00 PM', end: '11:00 PM', hours: 8.0, notes: 'Main Bar', user: 'usr-3', status: 'Covered', statusClass: 'covered' },
+        { role: 'Line cook', service: 'Hot line', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Evening Sautee', user: 'usr-6', status: 'Covered', statusClass: 'covered' },
+        { role: 'Busser', service: 'Support busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Dining Room', user: 'usr-5', status: 'Covered', statusClass: 'covered' },
+        { role: 'Shift Lead', service: 'Closing lead', start: '4:00 PM', end: '11:00 PM', hours: 7.0, notes: 'Lead Closeout', user: 'usr-7', status: 'Covered', statusClass: 'covered' },
+        { role: 'General Manager', service: 'Floor oversight', start: '10:00 AM', end: '6:00 PM', hours: 8.0, notes: 'Management Close', user: 'usr-1', status: 'Covered', statusClass: 'covered' },
+        { role: 'Bartender', service: 'Service bar', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Service Well', user: 'usr-4', status: 'Covered', statusClass: 'covered' }
       ]
     ];
 
@@ -314,13 +426,21 @@
 
   function recalculateUserHoursFromSchedule() {
     state.users.forEach(u => {
-      let totalHours = 0;
+      const weekHoursMap = {};
       state.shifts.forEach(s => {
         if (s.userId === u.id) {
-          totalHours += getShiftActualHours(s);
+          const bounds = getWorkweekBounds(s.dateIso);
+          if (bounds) {
+            weekHoursMap[bounds.startIso] = (weekHoursMap[bounds.startIso] || 0) + getShiftActualHours(s);
+          }
         }
       });
-      u.weeklyHours = parseFloat(totalHours.toFixed(1));
+      const weekTotals = Object.values(weekHoursMap);
+      if (weekTotals.length > 0) {
+        u.weeklyHours = parseFloat(Math.max(...weekTotals).toFixed(1));
+      } else {
+        u.weeklyHours = 0;
+      }
     });
   }
 
@@ -333,6 +453,11 @@
         const parsed = JSON.parse(saved);
         if (parsed.users && parsed.shifts && parsed.shifts.length > 0) {
           state = parsed;
+          state.users.forEach(u => {
+            if (!u.employmentType) {
+              u.employmentType = ['usr-2', 'usr-3', 'usr-5', 'usr-8'].includes(u.id) ? 'part-time' : 'full-time';
+            }
+          });
           state.roleWeights = Object.assign({}, DEFAULT_WEIGHTS, state.roleWeights);
           state.roleWeights['Shift Lead'] = 0.0;
           if (!state.auditLog) state.auditLog = JSON.parse(JSON.stringify(INITIAL_AUDIT_LOG));
@@ -574,7 +699,9 @@
     const isCertified = candidate.certifications && candidate.certifications.includes(targetShift.role);
     const shiftHours = targetShift.hours;
     const shiftPay = shiftHours * candidate.hourlyRate;
-    const projectedHours = candidate.weeklyHours + shiftHours;
+    const ot = checkEmployeeOvertime(candidate.id, targetShift.dateIso, shiftHours);
+    const currentWeeklyHours = ot ? ot.currentWeeklyHours : candidate.weeklyHours;
+    const projectedHours = ot ? ot.newWeeklyTotal : (currentWeeklyHours + shiftHours);
 
     if (!isCertified) {
       return {
@@ -584,7 +711,21 @@
         reason: `Lacks required '${targetShift.role}' certification. Has: [${(candidate.certifications || []).join(', ')}]`,
         canApprove: false,
         shiftPay: shiftPay,
-        projectedHours: projectedHours
+        projectedHours: projectedHours,
+        ot: ot
+      };
+    }
+
+    if (ot && ot.isOvertime) {
+      return {
+        status: 'safe',
+        badgeText: ot.badgeText,
+        badgeClass: 'ot-risk',
+        reason: `Station certified. Straight-time pay (${formatCurrency(shiftPay)}). Overtime alert: +${ot.hoursOver.toFixed(1)}h over ${ot.threshold.toFixed(0)}h limit (${ot.typeLabel}).`,
+        canApprove: true,
+        shiftPay: shiftPay,
+        projectedHours: projectedHours,
+        ot: ot
       };
     }
 
@@ -595,7 +736,8 @@
       reason: `Station certified. Standard straight-time wage applies (${formatCurrency(shiftPay)}).`,
       canApprove: true,
       shiftPay: shiftPay,
-      projectedHours: projectedHours
+      projectedHours: projectedHours,
+      ot: ot
     };
   }
 
@@ -680,7 +822,114 @@
   // Manager Approval Actions (Real-Time Sync with Schedule & Tip-Pool)
   // =========================================================================
 
-  function authorizeManagerApproval(appId) {
+  let activeOtContext = null;
+
+  function openOtApprovalModal(context) {
+    activeOtContext = context;
+    const modal = document.getElementById('otApprovalModal');
+    if (!modal) return;
+
+    const shiftTitle = document.getElementById('otApprovalShiftTitle');
+    const workerSummary = document.getElementById('otApprovalWorkerSummary');
+    const metricCurrent = document.getElementById('otMetricCurrent');
+    const metricAdding = document.getElementById('otMetricAdding');
+    const metricNew = document.getElementById('otMetricNew');
+    const metricOt = document.getElementById('otMetricOt');
+    const modalTitle = document.getElementById('otApprovalModalTitle');
+    const modalSubtitle = document.getElementById('otApprovalModalSubtitle');
+
+    const ot = context.ot;
+    const shift = context.shift;
+
+    if (modalTitle) {
+      modalTitle.textContent = `Overtime Warning Confirmation (${ot.typeLabel} • ${ot.threshold.toFixed(0)}h Limit)`;
+    }
+    if (modalSubtitle) {
+      modalSubtitle.textContent = `Manager authorization required for shift changes exceeding ${ot.threshold.toFixed(0)}.0 weekly hours (${ot.typeLabel} threshold).`;
+    }
+    if (shiftTitle) {
+      shiftTitle.textContent = `${shift.role} (${shift.serviceName}) • ${shift.scheduleDate}`;
+    }
+    if (workerSummary) {
+      workerSummary.innerHTML = `${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) will go from <strong>${ot.currentWeeklyHours.toFixed(1)} hrs</strong> to <strong style="color:#B45309;">${ot.newWeeklyTotal.toFixed(1)} hrs</strong> this week &mdash; <strong style="color:#B45309;">+${ot.hoursOver.toFixed(1)} hrs overtime</strong>.`;
+    }
+    if (metricCurrent) metricCurrent.textContent = `${ot.currentWeeklyHours.toFixed(1)}h`;
+    if (metricAdding) metricAdding.textContent = `+${shift.hours.toFixed(1)}h`;
+    if (metricNew) metricNew.textContent = `${ot.newWeeklyTotal.toFixed(1)}h`;
+    if (metricOt) metricOt.textContent = `+${ot.hoursOver.toFixed(1)}h`;
+
+    openModal('otApprovalModal');
+  }
+
+  function closeOtApprovalModal() {
+    activeOtContext = null;
+    closeModal('otApprovalModal');
+  }
+
+  function handleConfirmOtApproval() {
+    if (!activeOtContext) return;
+    const ctx = activeOtContext;
+    closeOtApprovalModal();
+
+    if (ctx.type === 'approval') {
+      authorizeManagerApproval(ctx.appId, true);
+    } else if (ctx.type === 'swap_candidate') {
+      assignCandidateToShiftWithOt(ctx.candId, ctx.shiftId, true);
+    }
+  }
+
+  function assignCandidateToShiftWithOt(candId, shiftId, isOtOverride = false) {
+    const shift = getShiftById(shiftId);
+    const candidate = getUserById(candId);
+    if (!shift || !candidate) return;
+
+    const prevName = shift.userId ? getUserById(shift.userId)?.name : 'Open';
+    const ot = checkEmployeeOvertime(candidate.id, shift.dateIso, shift.hours);
+
+    if (ot && ot.isOvertime && !isOtOverride) {
+      openOtApprovalModal({
+        type: 'swap_candidate',
+        candId: candId,
+        shiftId: shiftId,
+        shift: shift,
+        user: candidate,
+        ot: ot
+      });
+      return;
+    }
+
+    shift.userId = candidate.id;
+    shift.status = 'Covered';
+    shift.statusClass = 'swapped';
+    shift.isSwapped = true;
+    shift.swappedFrom = prevName;
+    shift.swapApprovedAt = new Date().toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    let auditDetails = `Manager reassigned ${shift.role} on ${shift.scheduleDate} to ${candidate.name}. Previous: ${prevName}.`;
+    if (ot && ot.isOvertime) {
+      auditDetails = `Approved with overtime warning: ${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) scheduled for ${ot.newWeeklyTotal.toFixed(1)} weekly hrs (+${ot.hoursOver.toFixed(1)} hrs over). Reassigned ${shift.role} on ${shift.scheduleDate}. Previous: ${prevName}.`;
+    }
+
+    state.auditLog.unshift({
+      id: 'audit-' + Date.now(),
+      timestamp: new Date().toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      }),
+      action: 'Shift Reassigned',
+      details: auditDetails,
+      type: 'coverage',
+      status: 'APPROVED'
+    });
+
+    recalculateUserHoursFromSchedule();
+    saveState();
+    renderAll();
+    showToast(ot && ot.isOvertime ? `Swap Approved with overtime warning recorded in audit log.` : `Swap Approved: ${candidate.name} is now covering ${shift.role}. Schedule and Tip Pool updated.`, 'success');
+  }
+
+  function authorizeManagerApproval(appId, isOtOverride = false) {
     const app = state.approvals.find(a => a.id === appId);
     if (!app) return;
 
@@ -691,6 +940,18 @@
       const prevUserId = shift.userId;
       const prevUser = prevUserId ? getUserById(prevUserId) : null;
       const prevName = prevUser ? prevUser.name : 'Unassigned / Open';
+
+      const ot = checkEmployeeOvertime(claimingUser.id, shift.dateIso, shift.hours);
+      if (ot && ot.isOvertime && !isOtOverride) {
+        openOtApprovalModal({
+          type: 'approval',
+          appId: appId,
+          shift: shift,
+          user: claimingUser,
+          ot: ot
+        });
+        return;
+      }
 
       // 1. Update Shift in Unified Schedule (Single Source of Truth)
       shift.userId = claimingUser.id;
@@ -703,13 +964,18 @@
       });
 
       // 2. Record Verified Audit Log Entry
+      let auditDetails = `${claimingUser.name} officially assigned to ${shift.role} (${shift.scheduleDate}, ${shift.hours.toFixed(1)}h). Previously assigned to: ${prevName}.`;
+      if (ot && ot.isOvertime) {
+        auditDetails = `Approved with overtime warning: ${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) scheduled for ${ot.newWeeklyTotal.toFixed(1)} weekly hrs (+${ot.hoursOver.toFixed(1)} hrs over). ${shift.role} on ${shift.scheduleDate} authorized. Previous: ${prevName}.`;
+      }
+
       state.auditLog.unshift({
         id: 'audit-' + Date.now(),
         timestamp: new Date().toLocaleString('en-US', {
           month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }),
         action: app.actionType === 'Swap' ? 'Shift Swap Authorized' : 'Shift Claim Authorized',
-        details: `${claimingUser.name} officially assigned to ${shift.role} (${shift.scheduleDate}, ${shift.hours.toFixed(1)}h). Previously assigned to: ${prevName}.`,
+        details: auditDetails,
         type: 'coverage',
         status: 'APPROVED'
       });
@@ -805,16 +1071,78 @@
       rangeHelp.textContent = `Coverage range: ${formatRangeDisplay(startDateStr, totalDays)} (${totalDays} days)`;
     }
 
-    const previewShifts = document.getElementById('builderPreviewShifts');
-    const previewHours = document.getElementById('builderPreviewHours');
-    const previewStaff = document.getElementById('builderPreviewStaff');
+    const previewShifts = generateStarterShifts(periodType, startDateStr);
+    const totalHours = previewShifts.reduce((acc, s) => acc + s.hours, 0);
+    const assignedUserIds = new Set(previewShifts.map(s => s.userId).filter(Boolean));
 
-    const estShifts = periodType === 'monthly' ? 60 : 28;
-    const estHours = (estShifts * 6.0).toFixed(1) + 'h';
+    const previewShiftsEl = document.getElementById('builderPreviewShifts');
+    const previewHoursEl = document.getElementById('builderPreviewHours');
+    const previewStaffEl = document.getElementById('builderPreviewStaff');
 
-    if (previewShifts) previewShifts.textContent = estShifts;
-    if (previewHours) previewHours.textContent = estHours;
-    if (previewStaff) previewStaff.textContent = '8';
+    if (previewShiftsEl) previewShiftsEl.textContent = previewShifts.length;
+    if (previewHoursEl) previewHoursEl.textContent = totalHours.toFixed(1) + 'h';
+    if (previewStaffEl) previewStaffEl.textContent = assignedUserIds.size;
+
+    // Check overtime across 7-day Sunday-Saturday workweeks
+    const weekMap = {};
+    previewShifts.forEach(s => {
+      if (s.userId) {
+        const bounds = getWorkweekBounds(s.dateIso);
+        if (bounds) {
+          if (!weekMap[bounds.startIso]) {
+            weekMap[bounds.startIso] = { label: bounds.label, users: {} };
+          }
+          weekMap[bounds.startIso].users[s.userId] = (weekMap[bounds.startIso].users[s.userId] || 0) + s.hours;
+        }
+      }
+    });
+
+    const otExceptions = [];
+    Object.keys(weekMap).forEach(wKey => {
+      const wk = weekMap[wKey];
+      Object.keys(wk.users).forEach(uId => {
+        const user = getUserById(uId);
+        if (user) {
+          const threshold = user.employmentType === 'part-time' ? 32.0 : 40.0;
+          const userHrs = wk.users[uId];
+          if (userHrs > threshold) {
+            otExceptions.push({
+              user,
+              threshold,
+              typeLabel: user.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time',
+              total: userHrs,
+              over: parseFloat((userHrs - threshold).toFixed(1)),
+              weekLabel: wk.label
+            });
+          }
+        }
+      });
+    });
+
+    const otBox = document.getElementById('builderOtSummaryBox');
+    if (otBox) {
+      if (otExceptions.length > 0) {
+        otBox.innerHTML = `
+          <div class="builder-ot-warning-box">
+            <div class="ot-title">⚠️ Weekly Overtime Alert (${otExceptions.length} Threshold Exceptions)</div>
+            <div class="ot-desc">Auto-population will schedule staff beyond their straight-time weekly thresholds (32h Part-Time / 40h Full-Time):</div>
+            <ul class="builder-ot-list">
+              ${otExceptions.map(item => `
+                <li><strong>${item.user.name}</strong> (${item.typeLabel}, ${item.threshold.toFixed(0)}h limit): 
+                  scheduled for <strong>${item.total.toFixed(1)} hrs</strong> (+${item.over.toFixed(1)}h over in week of ${item.weekLabel})
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      } else {
+        otBox.innerHTML = `
+          <div class="builder-ot-safe-box">
+            ✓ All staff weekly hours within straight-time limits (32h Part-Time / 40h Full-Time).
+          </div>
+        `;
+      }
+    }
   }
 
   function handlePublishSchedule() {
@@ -842,13 +1170,44 @@
     const mgr = getCurrentUser();
     const periodName = periodType === 'monthly' ? 'Monthly (30 Days)' : 'Bi-Weekly (14 Days)';
 
+    // Check overtime notes for publishing audit log
+    const weekMap = {};
+    newShifts.forEach(s => {
+      if (s.userId) {
+        const bounds = getWorkweekBounds(s.dateIso);
+        if (bounds) {
+          if (!weekMap[bounds.startIso]) weekMap[bounds.startIso] = {};
+          weekMap[bounds.startIso][s.userId] = (weekMap[bounds.startIso][s.userId] || 0) + s.hours;
+        }
+      }
+    });
+
+    const otNotes = [];
+    Object.keys(weekMap).forEach(wKey => {
+      const wkUsers = weekMap[wKey];
+      Object.keys(wkUsers).forEach(uId => {
+        const u = getUserById(uId);
+        if (u) {
+          const threshold = u.employmentType === 'part-time' ? 32.0 : 40.0;
+          if (wkUsers[uId] > threshold) {
+            otNotes.push(`${u.name} (${u.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time'}, ${threshold.toFixed(0)}h limit, ${wkUsers[uId].toFixed(1)}h)`);
+          }
+        }
+      });
+    });
+
+    let pubDetails = `${periodName} master schedule published by ${mgr ? mgr.name : 'Manager'} (${newShifts.length} shifts, ${formatRangeDisplay(startDateStr, periodType === 'monthly' ? 30 : 14)}).`;
+    if (otNotes.length > 0) {
+      pubDetails += ` Overtime warnings acknowledged for: ${otNotes.join('; ')}.`;
+    }
+
     state.auditLog.unshift({
       id: 'audit-' + Date.now(),
       timestamp: new Date().toLocaleString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
       }),
       action: 'Schedule Published',
-      details: `${periodName} master schedule published by ${mgr ? mgr.name : 'Manager'} (${newShifts.length} shifts, ${formatRangeDisplay(startDateStr, periodType === 'monthly' ? 30 : 14)}).`,
+      details: pubDetails,
       type: 'schedule',
       status: 'PUBLISHED'
     });
@@ -890,7 +1249,9 @@
       state.users.forEach(u => {
         const opt = document.createElement('option');
         opt.value = u.id;
-        opt.textContent = `${u.name} (${u.role})`;
+        const threshold = u.employmentType === 'part-time' ? 32 : 40;
+        const empLabel = u.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time';
+        opt.textContent = `${u.name} (${u.role} • ${empLabel} ${threshold}h)`;
         assigneeSelect.appendChild(opt);
       });
     }
@@ -923,6 +1284,7 @@
       if (statusSelect) statusSelect.value = 'Open';
     }
 
+    updateShiftEditOtWarning();
     openModal('shiftEditModal');
   }
 
@@ -930,8 +1292,56 @@
     closeModal('shiftEditModal');
   }
 
+  function updateShiftEditOtWarning() {
+    const banner = document.getElementById('editShiftOtWarning');
+    const details = document.getElementById('editShiftOtDetails');
+    const actions = document.getElementById('editShiftOtActions');
+    const titleEl = banner ? banner.querySelector('.ot-warning-title') : null;
+    const saveDefaultBtn = document.getElementById('btnSaveShiftDefault');
+
+    if (!banner || !details) return;
+
+    const assigneeSelect = document.getElementById('editShiftAssignee');
+    const hoursInput = document.getElementById('editShiftHours');
+    const dateInput = document.getElementById('editShiftDate');
+    const idInput = document.getElementById('editShiftId');
+
+    const userId = assigneeSelect ? assigneeSelect.value : null;
+    const hours = parseFloat(hoursInput ? hoursInput.value : 0) || 0;
+    const dateIso = dateInput ? dateInput.value : '';
+    const shiftId = idInput ? idInput.value : null;
+
+    if (!userId || !dateIso || hours <= 0) {
+      banner.style.display = 'none';
+      if (actions) actions.style.display = 'none';
+      if (saveDefaultBtn) saveDefaultBtn.style.display = 'inline-block';
+      return;
+    }
+
+    const ot = checkEmployeeOvertime(userId, dateIso, hours, shiftId);
+    if (ot && ot.isOvertime) {
+      banner.style.display = 'block';
+      if (titleEl) {
+        titleEl.textContent = `Overtime Warning (${ot.threshold.toFixed(1)}h Weekly Threshold Exceeded)`;
+      }
+      details.innerHTML = `
+        <strong>${ot.user.name}</strong> (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) will go from 
+        <strong>${ot.currentWeeklyHours.toFixed(1)} hrs</strong> to 
+        <strong style="color:#B45309;">${ot.newWeeklyTotal.toFixed(1)} hrs</strong> 
+        for the week of ${ot.weekLabel} &mdash; 
+        <span style="font-weight:800; color:#B45309;">+${ot.hoursOver.toFixed(1)} hrs overtime</span>.
+      `;
+      if (actions) actions.style.display = 'flex';
+      if (saveDefaultBtn) saveDefaultBtn.style.display = 'none';
+    } else {
+      banner.style.display = 'none';
+      if (actions) actions.style.display = 'none';
+      if (saveDefaultBtn) saveDefaultBtn.style.display = 'inline-block';
+    }
+  }
+
   function handleSaveShiftSubmit(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!isManagerUser()) {
       showToast('Manager credentials required.', 'error');
       return;
@@ -967,20 +1377,27 @@
       statusClass: statusSelect.value.toLowerCase().replace(/\s+/g, '-')
     };
 
+    const ot = shiftData.userId ? checkEmployeeOvertime(shiftData.userId, shiftData.dateIso, shiftData.hours, shiftId) : null;
+
     if (shiftId) {
       // Update existing
       const existing = getShiftById(shiftId);
       if (existing) {
         Object.assign(existing, shiftData);
+        let auditDetails = `Manager modified ${existing.role} on ${existing.scheduleDate} (${existing.hours}h). Assigned to: ${existing.userId ? getUserById(existing.userId)?.name : 'Open'}.`;
+        if (ot && ot.isOvertime) {
+          auditDetails = `Approved with overtime warning: ${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) scheduled for ${ot.newWeeklyTotal.toFixed(1)} weekly hrs (+${ot.hoursOver.toFixed(1)} hrs over). Shift modified: ${existing.role} on ${existing.scheduleDate}.`;
+        }
+
         state.auditLog.unshift({
           id: 'audit-' + Date.now(),
           timestamp: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
           action: 'Shift Modified',
-          details: `Manager modified ${existing.role} on ${existing.scheduleDate} (${existing.hours}h). Assigned to: ${existing.userId ? getUserById(existing.userId)?.name : 'Open'}.`,
+          details: auditDetails,
           type: 'schedule',
           status: 'UPDATED'
         });
-        showToast(`Updated shift: ${existing.role} (${existing.scheduleDate}).`, 'success');
+        showToast(ot && ot.isOvertime ? `Updated shift with overtime warning recorded in audit log.` : `Updated shift: ${existing.role} (${existing.scheduleDate}).`, 'success');
       }
     } else {
       // Add new shift
@@ -992,15 +1409,21 @@
         swapApprovedAt: null
       };
       state.shifts.push(newShift);
+
+      let auditDetails = `Manager created new ${newShift.role} shift on ${newShift.scheduleDate} (${newShift.hours}h).`;
+      if (ot && ot.isOvertime) {
+        auditDetails = `Approved with overtime warning: ${ot.user.name} (${ot.typeLabel}, ${ot.threshold.toFixed(0)}h limit) scheduled for ${ot.newWeeklyTotal.toFixed(1)} weekly hrs (+${ot.hoursOver.toFixed(1)} hrs over). New shift: ${newShift.role} on ${newShift.scheduleDate}.`;
+      }
+
       state.auditLog.unshift({
         id: 'audit-' + Date.now(),
         timestamp: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         action: 'Shift Created',
-        details: `Manager created new ${newShift.role} shift on ${newShift.scheduleDate} (${newShift.hours}h).`,
+        details: auditDetails,
         type: 'schedule',
         status: 'CREATED'
       });
-      showToast(`Added new shift: ${newShift.role} (${newShift.scheduleDate}).`, 'success');
+      showToast(ot && ot.isOvertime ? `Added new shift with overtime warning recorded.` : `Added new shift: ${newShift.role} (${newShift.scheduleDate}).`, 'success');
     }
 
     recalculateUserHoursFromSchedule();
@@ -1540,6 +1963,10 @@
           const isCertified = (user.certifications || []).includes(shift.role);
           const isSelected = state.selectedShiftId === shift.id;
           const isPendingMyReview = state.approvals.some(a => a.shiftId === shift.id && a.userId === user.id);
+          const ot = assignedUser ? checkEmployeeOvertime(assignedUser.id, shift.dateIso, 0) : null;
+          const otBadgeHtml = (ot && ot.isOvertime)
+            ? `<div style="margin-top:0.25rem;"><span class="status-pill ot-risk" style="font-size:0.68rem;" title="${ot.user.name} scheduled for ${ot.currentWeeklyHours}h in week of ${ot.weekLabel} (${ot.typeLabel} limit: ${ot.threshold}h)">⚠️ ${ot.badgeText}</span></div>`
+            : '';
 
           let statusBadgeHtml = '';
           if (shift.isSwapped) {
@@ -1619,14 +2046,20 @@
               ${assignedUser ? `
                 <div style="display:flex; align-items:center; gap:0.5rem;">
                   <span class="user-circle ${(assignedUser.initials || 'mc').toLowerCase()}" style="width:28px;height:28px;font-size:0.7rem;">${assignedUser.initials}</span>
-                  <span class="td-main-bold" style="${isMine ? 'color:#059669;' : ''}">
-                    ${assignedUser.name}${isMine ? ' (You)' : ''}
-                  </span>
+                  <div>
+                    <span class="td-main-bold" style="${isMine ? 'color:#059669;' : ''}">
+                      ${assignedUser.name}${isMine ? ' (You)' : ''}
+                    </span>
+                    <span class="employment-badge ${assignedUser.employmentType === 'part-time' ? 'pt' : 'ft'}" style="margin-left:0.35rem;">
+                      ${assignedUser.employmentType === 'part-time' ? 'PT 32h' : 'FT 40h'}
+                    </span>
+                  </div>
                 </div>
               ` : '<span style="color:#D97706; font-weight:700;">Open (Unassigned)</span>'}
             </td>
             <td>
               ${statusBadgeHtml}
+              ${otBadgeHtml}
             </td>
             <td class="action-th">
               ${actionButtons}
@@ -1743,14 +2176,19 @@
       let buttonHtml = '';
 
       if (item.status === 'safe') {
+        const isOt = item.ot && item.ot.isOvertime;
         metricsHtml = `
           <div class="metric-row">
+            <span>Employment Status:</span>
+            <span class="employment-badge ${c.employmentType === 'part-time' ? 'pt' : 'ft'}">${c.employmentType === 'part-time' ? 'Part-Time • 32h' : 'Full-Time • 40h'}</span>
+          </div>
+          <div class="metric-row">
             <span>Current Logged Hours:</span>
-            <strong>${c.weeklyHours.toFixed(1)} hrs</strong>
+            <strong>${(item.ot ? item.ot.currentWeeklyHours : c.weeklyHours).toFixed(1)} hrs</strong>
           </div>
           <div class="metric-row">
             <span>Projected with Shift:</span>
-            <strong style="color:#059669;">${item.projectedHours.toFixed(1)} hrs (Straight-Time)</strong>
+            <strong style="color:${isOt ? '#B45309' : '#059669'};">${item.projectedHours.toFixed(1)} hrs (${isOt ? `+${item.ot.hoursOver.toFixed(1)}h OT` : 'Straight-Time'})</strong>
           </div>
           <div class="metric-row">
             <span>Compensation Policy:</span>
@@ -1759,8 +2197,8 @@
         `;
 
         buttonHtml = `
-          <button class="btn-approve-swap safe" data-action="approve-swap" data-cand-id="${c.id}" data-shift-id="${shift.id}">
-            ✓ Assign to Shift
+          <button class="btn-approve-swap ${isOt ? 'pending' : 'safe'}" style="${isOt ? 'background:#D97706;color:#FFF;' : ''}" data-action="approve-swap" data-cand-id="${c.id}" data-shift-id="${shift.id}">
+            ${isOt ? '⚠️ Assign with Overtime' : '✓ Assign to Shift'}
           </button>
         `;
       } else {
@@ -1789,7 +2227,12 @@
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div>
-            <div class="cand-name">${c.name}</div>
+            <div class="cand-name">
+              ${c.name}
+              <span class="employment-badge ${c.employmentType === 'part-time' ? 'pt' : 'ft'}" style="margin-left:0.35rem;">
+                ${c.employmentType === 'part-time' ? 'Part-Time • 32h' : 'Full-Time • 40h'}
+              </span>
+            </div>
             <div class="cand-role-wage">${c.role} • Base ${formatCurrency(c.hourlyRate)}/hr</div>
           </div>
           <span class="legend-badge ${item.badgeClass}">${item.badgeText}</span>
@@ -1854,19 +2297,31 @@
         const shift = getShiftById(app.shiftId);
         const card = document.createElement('div');
         card.className = 'approval-card-item';
+        const claimingUser = getUserById(app.userId);
+        const ot = (shift && claimingUser) ? checkEmployeeOvertime(claimingUser.id, shift.dateIso, shift.hours) : null;
+        const otBadge = (ot && ot.isOvertime) 
+          ? `<span class="status-pill ot-risk" style="margin-top:0.35rem;">⚠️ ${ot.badgeText}</span>` 
+          : '';
+        const empBadge = claimingUser 
+          ? `<span class="employment-badge ${claimingUser.employmentType === 'part-time' ? 'pt' : 'ft'}" style="margin-left:0.35rem;">${claimingUser.employmentType === 'part-time' ? 'Part-Time • 32h' : 'Full-Time • 40h'}</span>` 
+          : '';
+
         card.innerHTML = `
           <div style="display:flex; align-items:center; gap:1rem;">
             <div class="user-circle ${app.circleClass}">${app.initials}</div>
             <div>
               <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">${app.actionType}: ${app.shiftRole} (${app.shiftName})</div>
-              <div style="font-size:0.8rem; color:var(--text-muted);">${app.date} &bull; Requested by ${app.name}</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">${app.date} &bull; Requested by ${app.name} ${empBadge}</div>
               <div style="font-size:0.8rem; color:var(--text-dark); margin-top:0.25rem;"><em>"${app.note}"</em></div>
-              ${shift?.isSwapped ? '<span class="status-pill swapped" style="margin-top:0.35rem;">Previously Swapped</span>' : ''}
+              <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; margin-top:0.35rem;">
+                ${shift?.isSwapped ? '<span class="status-pill swapped">Previously Swapped</span>' : ''}
+                ${otBadge}
+              </div>
             </div>
           </div>
-          <div style="display:flex; gap:0.5rem;">
-            <button class="btn btn-peach" data-action="authorize-approval" data-app-id="${app.id}">
-              Authorize
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <button class="btn ${ot && ot.isOvertime ? 'btn-warning-action' : 'btn-peach'}" data-action="authorize-approval" data-app-id="${app.id}">
+              ${ot && ot.isOvertime ? '⚠️ Review OT & Authorize' : 'Authorize'}
             </button>
             <button class="btn btn-card-outline" data-action="dismiss-approval" data-app-id="${app.id}">
               Dismiss
@@ -2232,18 +2687,26 @@
       const userShifts = state.shifts.filter(s => s.userId === u.id);
       const isWorking = userShifts.length > 0;
       const certPills = (u.certifications || []).map(c => `<span class="cert-pill">${c}</span>`).join(' ');
+      const threshold = u.employmentType === 'part-time' ? 32.0 : 40.0;
+      const isOverLimit = u.weeklyHours > threshold;
+      const overAmount = isOverLimit ? (u.weeklyHours - threshold).toFixed(1) : 0;
+      const isPt = u.employmentType === 'part-time';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
           <div class="td-main-bold">${u.name}</div>
-          ${u.role !== 'Employee' ? `<span class="manager-badge" style="font-size:0.65rem;">${u.role}</span>` : ''}
+          <div style="display:flex; align-items:center; gap:0.35rem; margin-top:2px;">
+            <span class="employment-badge ${isPt ? 'pt' : 'ft'}">${isPt ? 'Part-Time • 32h' : 'Full-Time • 40h'}</span>
+            ${u.role !== 'Employee' ? `<span class="manager-badge" style="font-size:0.65rem;">${u.role}</span>` : ''}
+          </div>
         </td>
         <td>${(u.certifications && u.certifications[0]) || u.role}</td>
         <td>${certPills}</td>
         <td class="num-col">${formatCurrency(u.hourlyRate)}/hr</td>
         <td class="num-col font-mono" style="font-weight:700;">
-          ${u.weeklyHours.toFixed(1)} hrs
+          <div>${u.weeklyHours.toFixed(1)} hrs</div>
+          ${isOverLimit ? `<span class="status-pill ot-risk" style="font-size:0.68rem; margin-top:2px;" title="${overAmount}h over ${threshold}h ${isPt ? 'PT' : 'FT'} limit">⚠️ OT (+${overAmount}h)</span>` : ''}
         </td>
         <td>
           ${isWorking 
@@ -2298,6 +2761,7 @@
   }
 
   function renderManageAccessView() {
+    if (!isManagerUser()) return;
     const container = document.getElementById('accessUsersList');
     if (!container) return;
 
@@ -2308,13 +2772,22 @@
       row.setAttribute('data-user-id', user.id);
 
       const isPrimary = user.isPrimaryAdmin;
+      const isPt = user.employmentType === 'part-time';
 
       row.innerHTML = `
         <div class="access-user-left">
           <span class="access-name">${user.name}</span>
+          <span class="employment-badge ${isPt ? 'pt' : 'ft'}">
+            ${isPt ? 'Part-Time • 32h' : 'Full-Time • 40h'}
+          </span>
         </div>
 
         <div class="access-user-controls">
+          <select class="access-employment-select" data-user-id="${user.id}" title="Set Full-Time or Part-Time employment threshold">
+            <option value="full-time" ${!isPt ? 'selected' : ''}>Full-Time (40 hrs/wk max)</option>
+            <option value="part-time" ${isPt ? 'selected' : ''}>Part-Time (32 hrs/wk max)</option>
+          </select>
+
           <select class="access-role-select" data-user-id="${user.id}" ${isPrimary ? 'disabled style="opacity:0.75;"' : ''}>
             <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
             <option value="Manager" ${user.role === 'Manager' ? 'selected' : ''}>Manager</option>
@@ -2500,8 +2973,14 @@
   };
 
   function switchView(viewId) {
-    state.currentView = viewId;
     const isMgr = isManagerUser();
+    const managerOnlyViews = ['view-access', 'view-roster', 'view-audit'];
+    if (!isMgr && managerOnlyViews.includes(viewId)) {
+      showToast('Manager credentials required to access this workspace.', 'error');
+      viewId = 'view-overview';
+    }
+
+    state.currentView = viewId;
 
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-view') === viewId);
@@ -2586,10 +3065,12 @@
       return;
     }
     const roleSelect = document.getElementById('newMemberRole');
+    const empTypeSelect = document.getElementById('newMemberEmploymentType');
     const nameInput = document.getElementById('newMemberName');
     const pinInput = document.getElementById('newMemberPin');
     const title = document.getElementById('addMemberModalTitle');
     if (roleSelect) roleSelect.value = defaultRole;
+    if (empTypeSelect) empTypeSelect.value = defaultRole === 'Manager' ? 'full-time' : 'part-time';
     if (nameInput) nameInput.value = '';
     if (pinInput) pinInput.value = '';
     if (title) title.textContent = defaultRole === 'Manager' ? 'Add Manager' : 'Add Team Member';
@@ -2608,10 +3089,12 @@
     }
     const nameInput = document.getElementById('newMemberName');
     const roleSelect = document.getElementById('newMemberRole');
+    const empTypeSelect = document.getElementById('newMemberEmploymentType');
     const pinInput = document.getElementById('newMemberPin');
 
     const name = nameInput ? nameInput.value.trim() : '';
     const role = roleSelect ? roleSelect.value : 'Employee';
+    const employmentType = empTypeSelect ? empTypeSelect.value : (role === 'Manager' || role === 'Admin' ? 'full-time' : 'part-time');
     const pin = pinInput ? pinInput.value.trim() : '';
 
     if (!name || pin.length !== 4) {
@@ -2626,6 +3109,7 @@
       id: newId,
       name,
       role: role === 'Admin' ? 'Admin' : (role === 'Manager' ? 'Manager' : 'Employee'),
+      employmentType,
       pin,
       initials,
       certifications: role === 'Manager' ? ['Shift Lead', 'Server', 'Bartender'] : ['Server'],
@@ -2637,7 +3121,7 @@
     saveState();
     closeAddMemberModal();
     renderAll();
-    showToast(`Added ${name} (${newUser.role}) successfully!`, 'success');
+    showToast(`Added ${name} (${newUser.role} • ${newUser.employmentType === 'part-time' ? 'Part-Time 32h' : 'Full-Time 40h'}) successfully!`, 'success');
   }
 
   function setupEventListeners() {
@@ -2735,6 +3219,24 @@
     document.getElementById('btnCloseShiftEditModal')?.addEventListener('click', closeShiftEditModal);
     document.getElementById('btnCancelShiftEdit')?.addEventListener('click', closeShiftEditModal);
     document.getElementById('shiftEditForm')?.addEventListener('submit', handleSaveShiftSubmit);
+
+    // Live Overtime Checking in Edit Shift Modal
+    document.getElementById('editShiftAssignee')?.addEventListener('change', updateShiftEditOtWarning);
+    document.getElementById('editShiftHours')?.addEventListener('input', updateShiftEditOtWarning);
+    document.getElementById('editShiftDate')?.addEventListener('input', updateShiftEditOtWarning);
+    document.getElementById('btnConfirmSaveWithOt')?.addEventListener('click', (e) => {
+      handleSaveShiftSubmit(e);
+    });
+    document.getElementById('btnCancelOtSave')?.addEventListener('click', () => {
+      const assigneeSelect = document.getElementById('editShiftAssignee');
+      if (assigneeSelect) assigneeSelect.value = '';
+      updateShiftEditOtWarning();
+    });
+
+    // Overtime Approval Modal Controls
+    document.getElementById('btnCloseOtApprovalModal')?.addEventListener('click', closeOtApprovalModal);
+    document.getElementById('btnCancelOtApproval')?.addEventListener('click', closeOtApprovalModal);
+    document.getElementById('btnConfirmOtApproval')?.addEventListener('click', handleConfirmOtApproval);
 
     // Hero buttons & Quick actions
     document.addEventListener('click', (e) => {
@@ -2976,35 +3478,7 @@
         if (!isManagerUser()) return;
         const candId = approveSwapBtn.getAttribute('data-cand-id');
         const shiftId = approveSwapBtn.getAttribute('data-shift-id');
-        const shift = getShiftById(shiftId);
-        const candidate = getUserById(candId);
-        if (shift && candidate) {
-          const prevName = shift.userId ? getUserById(shift.userId)?.name : 'Open';
-          shift.userId = candidate.id;
-          shift.status = 'Covered';
-          shift.statusClass = 'swapped';
-          shift.isSwapped = true;
-          shift.swappedFrom = prevName;
-          shift.swapApprovedAt = new Date().toLocaleString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
-          });
-
-          state.auditLog.unshift({
-            id: 'audit-' + Date.now(),
-            timestamp: new Date().toLocaleString('en-US', {
-              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
-            }),
-            action: 'Shift Reassigned',
-            details: `Manager reassigned ${shift.role} on ${shift.scheduleDate} to ${candidate.name}. Previous: ${prevName}.`,
-            type: 'coverage',
-            status: 'APPROVED'
-          });
-
-          recalculateUserHoursFromSchedule();
-          saveState();
-          renderAll();
-          showToast(`Swap Approved: ${candidate.name} is now covering ${shift.role}. Schedule and Tip Pool updated.`, 'success');
-        }
+        assignCandidateToShiftWithOt(candId, shiftId, false);
         return;
       }
 
@@ -3027,12 +3501,20 @@
 
         const row = saveAccessBtn.closest('.access-user-row');
         const roleSelect = row.querySelector('.access-role-select');
+        const empSelect = row.querySelector('.access-employment-select');
         const pinInput = row.querySelector('.access-pin-input');
 
         let updatedMsg = [];
         if (roleSelect && roleSelect.value !== user.role) {
           user.role = roleSelect.value;
           updatedMsg.push(`Role: ${user.role}`);
+        }
+
+        if (empSelect && empSelect.value !== user.employmentType) {
+          user.employmentType = empSelect.value;
+          const limit = user.employmentType === 'part-time' ? '32h' : '40h';
+          const typeName = user.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time';
+          updatedMsg.push(`Status: ${typeName} (${limit})`);
         }
 
         const newPin = (pinInput?.value || '').trim();
@@ -3052,6 +3534,7 @@
         }
 
         if (updatedMsg.length > 0) {
+          recalculateUserHoursFromSchedule();
           saveState();
           renderAll();
           showToast(`Saved changes for ${user.name}: ${updatedMsg.join(', ')}.`, 'success');
@@ -3131,6 +3614,24 @@
           if (badge) badge.textContent = `${val.toFixed(1)}x`;
           saveState();
           renderTipCalculator();
+        }
+      }
+    });
+
+    // Manage Access: live change listener for employment selector
+    document.getElementById('accessUsersList')?.addEventListener('change', (e) => {
+      const empSelect = e.target.closest('.access-employment-select');
+      if (empSelect) {
+        const userId = empSelect.getAttribute('data-user-id');
+        const user = getUserById(userId);
+        if (user && user.employmentType !== empSelect.value) {
+          user.employmentType = empSelect.value;
+          recalculateUserHoursFromSchedule();
+          saveState();
+          renderAll();
+          const limit = user.employmentType === 'part-time' ? '32h max' : '40h max';
+          const typeName = user.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time';
+          showToast(`Updated ${user.name} to ${typeName} (${limit}).`, 'success');
         }
       }
     });
