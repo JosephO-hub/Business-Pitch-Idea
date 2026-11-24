@@ -395,12 +395,133 @@
   ];
 
   // =========================================================================
+  // 12-Month Rolling Historical Schedule Retention & Synthetic History
+  // =========================================================================
+
+  function pruneExpiredHistoricalShifts(shifts) {
+    if (!Array.isArray(shifts)) return [];
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setMonth(cutoff.getMonth() - 12);
+    const cutoffIso = formatDateIso(cutoff);
+
+    return shifts.filter(s => {
+      if (!s.dateIso) return true;
+      return s.dateIso >= cutoffIso;
+    });
+  }
+
+  function generateStarterShiftsWithHistory(periodType = 'biweekly', startDateStr = '2026-11-20') {
+    const activeShifts = generateStarterShifts(periodType, startDateStr);
+    const shifts = [...activeShifts];
+
+    const refDate = new Date(startDateStr + 'T00:00:00');
+    let histCounter = 1;
+
+    const histTemplates = [
+      [
+        { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Main Dining Room', user: 'usr-3' },
+        { role: 'Bartender', service: 'Bar service', start: '4:30 PM', end: '10:30 PM', hours: 6.0, notes: 'Lounge Bar', user: 'usr-4' },
+        { role: 'Line cook', service: 'Line service', start: '3:00 PM', end: '9:00 PM', hours: 6.0, notes: 'Kitchen Sautee', user: 'usr-6' },
+        { role: 'Shift Lead', service: 'Closing lead', start: '4:00 PM', end: '11:00 PM', hours: 7.0, notes: 'Supervision', user: 'usr-7' }
+      ],
+      [
+        { role: 'Server', service: 'Patio support', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Patio Station', user: 'usr-2' },
+        { role: 'Bartender', service: 'Main bar', start: '3:00 PM', end: '11:00 PM', hours: 8.0, notes: 'Craft Counter', user: 'usr-3' },
+        { role: 'Host', service: 'Evening host', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Front Desk', user: 'usr-8' },
+        { role: 'Busser', service: 'Support busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Floor Support', user: 'usr-5' }
+      ],
+      [
+        { role: 'Server', service: 'Dinner service', start: '4:00 PM', end: '10:00 PM', hours: 6.0, notes: 'Main Floor', user: 'usr-2', isSwapped: true, swappedFrom: 'Jordan Ellis' },
+        { role: 'Bartender', service: 'Bar close', start: '5:00 PM', end: '11:00 PM', hours: 6.0, notes: 'Craft Bar', user: 'usr-4' },
+        { role: 'Line cook', service: 'Kitchen prep', start: '11:00 AM', end: '5:00 PM', hours: 6.0, notes: 'Sautee Station', user: 'usr-6' },
+        { role: 'General Manager', service: 'Floor oversight', start: '10:00 AM', end: '6:00 PM', hours: 8.0, notes: 'Management Close', user: 'usr-1' }
+      ],
+      [
+        { role: 'Server', service: 'Lunch turnover', start: '11:00 AM', end: '5:00 PM', hours: 6.0, notes: 'Section 1', user: 'usr-3' },
+        { role: 'Host', service: 'Brunch service', start: '10:00 AM', end: '4:00 PM', hours: 6.0, notes: 'Entrance Desk', user: 'usr-8' },
+        { role: 'Busser', service: 'Evening busser', start: '5:00 PM', end: '10:00 PM', hours: 5.0, notes: 'Floor Clearing', user: 'usr-5' },
+        { role: 'Shift Lead', service: 'Floor lead', start: '4:00 PM', end: '11:00 PM', hours: 7.0, notes: 'Supervision', user: 'usr-7' }
+      ]
+    ];
+
+    // Generate historical shifts across 12 months prior
+    for (let m = 12; m >= 1; m--) {
+      const monthDate = new Date(refDate.getFullYear(), refDate.getMonth() - m, 1);
+      const y = monthDate.getFullYear();
+      const monthIdx = monthDate.getMonth();
+      const daysInMonth = new Date(y, monthIdx + 1, 0).getDate();
+
+      const serviceDays = [3, 7, 11, 15, 19, 23, 27].filter(d => d <= daysInMonth);
+
+      serviceDays.forEach((dayNum, dayIdx) => {
+        const curDate = new Date(y, monthIdx, dayNum);
+        const dateIso = formatDateIso(curDate);
+        const dateDisplay = formatDateDisplay(curDate);
+        const template = histTemplates[dayIdx % histTemplates.length];
+
+        template.forEach(tpl => {
+          shifts.push({
+            id: `hist-${histCounter++}`,
+            userId: tpl.user,
+            role: tpl.role,
+            serviceName: tpl.service,
+            scheduleDate: dateDisplay,
+            dateIso: dateIso,
+            startTime: tpl.start,
+            endTime: tpl.end,
+            hours: tpl.hours,
+            status: 'Covered',
+            statusClass: tpl.isSwapped ? 'swapped' : 'covered',
+            notes: tpl.notes,
+            isSwapped: !!tpl.isSwapped,
+            swappedFrom: tpl.swappedFrom || null,
+            swapApprovedAt: tpl.isSwapped ? `${dateDisplay}, 02:30 PM` : null
+          });
+        });
+      });
+    }
+
+    // Historical shifts in November 2026 prior to active schedule start
+    const curMonthDays = [2, 5, 8, 11, 14, 17, 19];
+    curMonthDays.forEach((dayNum, dayIdx) => {
+      const curDate = new Date(refDate.getFullYear(), refDate.getMonth(), dayNum);
+      const dateIso = formatDateIso(curDate);
+      if (dateIso < startDateStr) {
+        const dateDisplay = formatDateDisplay(curDate);
+        const template = histTemplates[dayIdx % histTemplates.length];
+        template.forEach(tpl => {
+          shifts.push({
+            id: `hist-${histCounter++}`,
+            userId: tpl.user,
+            role: tpl.role,
+            serviceName: tpl.service,
+            scheduleDate: dateDisplay,
+            dateIso: dateIso,
+            startTime: tpl.start,
+            endTime: tpl.end,
+            hours: tpl.hours,
+            status: 'Covered',
+            statusClass: tpl.isSwapped ? 'swapped' : 'covered',
+            notes: tpl.notes,
+            isSwapped: !!tpl.isSwapped,
+            swappedFrom: tpl.swappedFrom || null,
+            swapApprovedAt: tpl.isSwapped ? `${dateDisplay}, 02:30 PM` : null
+          });
+        });
+      }
+    });
+
+    return pruneExpiredHistoricalShifts(shifts);
+  }
+
+  // =========================================================================
   // State Container & LocalStorage Single Source of Truth
   // =========================================================================
 
   let state = {
     users: JSON.parse(JSON.stringify(INITIAL_USERS)),
-    shifts: generateStarterShifts('biweekly', '2026-11-20'),
+    shifts: generateStarterShiftsWithHistory('biweekly', '2026-11-20'),
     approvals: JSON.parse(JSON.stringify(INITIAL_APPROVALS)),
     auditLog: JSON.parse(JSON.stringify(INITIAL_AUDIT_LOG)),
     scheduleSettings: {
@@ -410,8 +531,12 @@
       publishedAt: '2026-11-20T09:00:00Z'
     },
     scheduleViewPeriod: 'biweekly', // 'biweekly' or 'monthly'
+    scheduleDisplayMode: 'list', // 'list' or 'calendar'
     scheduleFilter: 'all', // 'all', 'my-shifts', 'grabs', 'swapped'
     scheduleDateFilter: 'all',
+    calendarYear: 2026,
+    calendarMonth: 10, // 0-indexed: 10 = November
+    calendarSelectedDate: '2026-11-23',
     currentUserId: 'usr-3', // Default demo: Jordan Ellis (Employee)
     currentView: 'view-overview',
     selectedShiftId: null,
@@ -425,22 +550,19 @@
   };
 
   function recalculateUserHoursFromSchedule() {
+    const activeStartDate = state.scheduleSettings?.startDate || '2026-11-20';
+    const activeBounds = getWorkweekBounds(activeStartDate);
     state.users.forEach(u => {
-      const weekHoursMap = {};
+      let activeWeekHours = 0;
       state.shifts.forEach(s => {
-        if (s.userId === u.id) {
+        if (s.userId === u.id && s.dateIso) {
           const bounds = getWorkweekBounds(s.dateIso);
-          if (bounds) {
-            weekHoursMap[bounds.startIso] = (weekHoursMap[bounds.startIso] || 0) + getShiftActualHours(s);
+          if (bounds && activeBounds && bounds.startIso === activeBounds.startIso) {
+            activeWeekHours += getShiftActualHours(s);
           }
         }
       });
-      const weekTotals = Object.values(weekHoursMap);
-      if (weekTotals.length > 0) {
-        u.weeklyHours = parseFloat(Math.max(...weekTotals).toFixed(1));
-      } else {
-        u.weeklyHours = 0;
-      }
+      u.weeklyHours = parseFloat(activeWeekHours.toFixed(1));
     });
   }
 
@@ -470,8 +592,23 @@
             };
           }
           if (!state.scheduleViewPeriod) state.scheduleViewPeriod = 'biweekly';
+          if (!state.scheduleDisplayMode) state.scheduleDisplayMode = 'list';
           if (!state.scheduleFilter) state.scheduleFilter = 'all';
           if (!state.scheduleDateFilter) state.scheduleDateFilter = 'all';
+          if (state.calendarYear === undefined) state.calendarYear = 2026;
+          if (state.calendarMonth === undefined) state.calendarMonth = 10;
+          if (!state.calendarSelectedDate) state.calendarSelectedDate = '2026-11-23';
+
+          // If previously saved state had no historical shifts, merge in synthetic history
+          const hasHistorical = state.shifts.some(s => s.dateIso && s.dateIso < (state.scheduleSettings?.startDate || '2026-11-20'));
+          if (!hasHistorical) {
+            const histShifts = generateStarterShiftsWithHistory(state.scheduleSettings?.periodType || 'biweekly', state.scheduleSettings?.startDate || '2026-11-20')
+              .filter(s => s.id && s.id.startsWith('hist-'));
+            state.shifts = state.shifts.concat(histShifts);
+          }
+
+          // Prune records older than 12 months rolling window
+          state.shifts = pruneExpiredHistoricalShifts(state.shifts);
         }
       }
     } catch (e) {
@@ -482,6 +619,8 @@
 
   function saveState() {
     try {
+      // Automatically prune historical shifts older than 12 months before persisting
+      state.shifts = pruneExpiredHistoricalShifts(state.shifts);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       console.warn('Could not save localStorage state:', e);
@@ -491,7 +630,7 @@
   function resetState() {
     state = {
       users: JSON.parse(JSON.stringify(INITIAL_USERS)),
-      shifts: generateStarterShifts('biweekly', '2026-11-20'),
+      shifts: generateStarterShiftsWithHistory('biweekly', '2026-11-20'),
       approvals: JSON.parse(JSON.stringify(INITIAL_APPROVALS)),
       auditLog: JSON.parse(JSON.stringify(INITIAL_AUDIT_LOG)),
       scheduleSettings: {
@@ -501,8 +640,12 @@
         publishedAt: '2026-11-20T09:00:00Z'
       },
       scheduleViewPeriod: 'biweekly',
+      scheduleDisplayMode: 'list',
       scheduleFilter: 'all',
       scheduleDateFilter: 'all',
+      calendarYear: 2026,
+      calendarMonth: 10, // November 2026
+      calendarSelectedDate: '2026-11-23',
       currentUserId: 'usr-3', // Jordan Ellis (Employee)
       currentView: 'view-overview',
       selectedShiftId: null,
@@ -518,7 +661,7 @@
     saveState();
     switchView('view-overview');
     updateAuthUi();
-    showToast('Reset to default Juniper Kitchen restaurant data.', 'info');
+    showToast('Reset to default Juniper Kitchen restaurant data (with 12-month rolling history).', 'info');
   }
 
   // =========================================================================
@@ -1224,7 +1367,7 @@
   // Manager Add / Edit Shift Engine
   // =========================================================================
 
-  function openShiftEditModal(shiftId = null) {
+  function openShiftEditModal(shiftId = null, prefillDate = null) {
     if (!isManagerUser()) {
       showToast('Manager credentials required to edit shifts.', 'error');
       return;
@@ -1273,7 +1416,7 @@
     } else {
       if (titleEl) titleEl.textContent = 'Add New Shift';
       if (idInput) idInput.value = '';
-      if (dateInput) dateInput.value = state.scheduleSettings?.startDate || '2026-11-20';
+      if (dateInput) dateInput.value = prefillDate || state.calendarSelectedDate || state.scheduleSettings?.startDate || '2026-11-20';
       if (serviceInput) serviceInput.value = 'Dinner service';
       if (roleSelect) roleSelect.value = 'Server';
       if (hoursInput) hoursInput.value = '6.0';
@@ -1472,8 +1615,20 @@
 
     const crewMap = new Map();
 
-    state.shifts.forEach(shift => {
-      if (!shift.userId) return;
+    const viewPeriod = state.scheduleViewPeriod || 'biweekly';
+    const totalDays = viewPeriod === 'monthly' ? 30 : 14;
+    const startDateStr = state.scheduleSettings?.startDate || '2026-11-20';
+    const startTimestamp = new Date(startDateStr + 'T00:00:00').getTime();
+    const endTimestamp = startTimestamp + totalDays * 86400000;
+
+    const periodShifts = state.shifts.filter(shift => {
+      if (!shift.userId) return false;
+      if (!shift.dateIso) return true;
+      const t = new Date(shift.dateIso + 'T00:00:00').getTime();
+      return t >= startTimestamp && t < endTimestamp;
+    });
+
+    periodShifts.forEach(shift => {
       const user = getUserById(shift.userId);
       if (!user) return;
 
@@ -1807,10 +1962,77 @@
   // Master Schedule & Coverage View (Unified for Manager & Employee)
   // =========================================================================
 
+  function formatLongDateDisplay(dateIso) {
+    if (!dateIso) return '';
+    const [y, m, d] = dateIso.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  }
+
   function renderShiftBoardView() {
     const isMgr = isManagerUser();
     const user = getCurrentUser();
     if (!user) return;
+
+    // 0. Update Heading Title based on Role
+    const mainTitle = document.getElementById('shiftBoardMainTitle');
+    if (mainTitle) {
+      mainTitle.textContent = isMgr ? 'Master Schedule & Coverage' : 'Shift Board & Coverage';
+    }
+
+    // 0. View Mode Toggle ("List View" | "Calendar View")
+    const viewMode = state.scheduleDisplayMode || 'list';
+    const btnList = document.getElementById('btnViewModeList');
+    const btnCal = document.getElementById('btnViewModeCalendar');
+    const listControls = document.getElementById('scheduleListHeaderControls');
+    const masterCard = document.getElementById('masterScheduleCard');
+    const swapPanel = document.getElementById('swapEnginePanel');
+    const calCard = document.getElementById('calendarViewCard');
+
+    if (btnList) btnList.classList.toggle('active', viewMode === 'list');
+    if (btnCal) btnCal.classList.toggle('active', viewMode === 'calendar');
+
+    // Header Right Profile Pill
+    const headerRight = document.getElementById('shiftBoardHeaderRight');
+    if (headerRight) {
+      headerRight.innerHTML = `
+        <div style="text-align: right;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+            ${isMgr ? 'Manager Mode' : 'Team Member Mode'}
+          </div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-dark);">${user.name}</div>
+        </div>
+      `;
+    }
+
+    // Header Subtitle
+    const subtitle = document.getElementById('shiftBoardSubtitle');
+    if (subtitle) {
+      if (viewMode === 'calendar') {
+        subtitle.textContent = isMgr 
+          ? 'Monthly calendar view of published restaurant schedule. Click any day to edit or add shifts.' 
+          : 'Monthly calendar view of published schedule. Color highlights show your shifts and open shifts.';
+      } else {
+        subtitle.textContent = isMgr 
+          ? 'Manage schedules, add shifts, validate coverage replacements, and track published shifts.' 
+          : 'View published schedule, claim open shifts, offer your shifts for coverage, or propose a swap.';
+      }
+    }
+
+    if (viewMode === 'calendar') {
+      if (listControls) listControls.style.display = 'none';
+      if (masterCard) masterCard.style.display = 'none';
+      if (swapPanel) swapPanel.style.display = 'none';
+      if (calCard) calCard.style.display = 'block';
+      renderCalendarView();
+      return;
+    } else {
+      if (listControls) listControls.style.display = 'flex';
+      if (masterCard) masterCard.style.display = 'block';
+      if (calCard) calCard.style.display = 'none';
+    }
 
     // 1. Period Toggle Buttons & Range Badge
     const btnBiweekly = document.getElementById('btnToggleBiweekly');
@@ -1831,29 +2053,6 @@
     const mgrActions = document.getElementById('managerScheduleActions');
     if (mgrActions) {
       mgrActions.style.display = isMgr ? 'flex' : 'none';
-    }
-
-    // 3. Header Subtitle
-    const subtitle = document.getElementById('shiftBoardSubtitle');
-    if (subtitle) {
-      if (isMgr) {
-        subtitle.textContent = 'Manage schedules, add shifts, validate coverage replacements, and track published shifts.';
-      } else {
-        subtitle.textContent = 'View published schedule, claim open shifts, offer your shifts for coverage, or propose a swap.';
-      }
-    }
-
-    // 4. Header Right Profile Pill
-    const headerRight = document.getElementById('shiftBoardHeaderRight');
-    if (headerRight) {
-      headerRight.innerHTML = `
-        <div style="text-align: right;">
-          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-            ${isMgr ? 'Manager Mode' : 'Team Member Mode'}
-          </div>
-          <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-dark);">${user.name}</div>
-        </div>
-      `;
     }
 
     // 5. Filter Shifts by View Period Window (Bi-Weekly = 14 days, Monthly = 30 days)
@@ -2078,6 +2277,417 @@
     } else {
       renderSwapEnginePanel();
     }
+  }
+
+  // =========================================================================
+  // Monthly Calendar View & Approval-Sync Day Drawer
+  // =========================================================================
+
+  function renderCalendarView() {
+    const isMgr = isManagerUser();
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const calCard = document.getElementById('calendarViewCard');
+    if (!calCard) return;
+
+    // 1. Initialize calendar year/month/date if not set
+    const now = new Date();
+    const todayIso = formatDateIso(now);
+    if (state.calendarYear === undefined) state.calendarYear = 2026;
+    if (state.calendarMonth === undefined) state.calendarMonth = 10; // November
+    if (!state.calendarSelectedDate) state.calendarSelectedDate = todayIso;
+
+    // 2. Navigation controls and 12-month retention boundary
+    const btnPrev = document.getElementById('btnCalPrevMonth');
+    const titleEl = document.getElementById('calendarMonthTitle');
+    const statsBadge = document.getElementById('calendarMonthStats');
+    const legendMyShift = document.getElementById('legendLabelMyShift');
+
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    if (titleEl) {
+      titleEl.textContent = `${monthNames[state.calendarMonth]} ${state.calendarYear}`;
+    }
+
+    if (legendMyShift) {
+      legendMyShift.textContent = `My Shift (${user.name.split(' ')[0]})`;
+    }
+
+    // 12-month rolling retention boundary check
+    const minRetentionDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+    const prevMonthDate = new Date(state.calendarYear, state.calendarMonth - 1, 1);
+    const isAt12MonthLimit = prevMonthDate < minRetentionDate;
+
+    if (btnPrev) {
+      btnPrev.disabled = isAt12MonthLimit;
+      btnPrev.title = isAt12MonthLimit
+        ? '12-Month historical retention limit reached (older records automatically pruned)'
+        : 'Navigate to previous month';
+    }
+
+    // Published shifts count for current month
+    const monthPrefix = `${state.calendarYear}-${String(state.calendarMonth + 1).padStart(2, '0')}`;
+    const currentMonthShifts = state.shifts.filter(s => s.dateIso && s.dateIso.startsWith(monthPrefix));
+    if (statsBadge) {
+      statsBadge.textContent = `${currentMonthShifts.length} Published Shift${currentMonthShifts.length === 1 ? '' : 's'}`;
+    }
+
+    // 3. Render Grid Cells (Sunday–Saturday 7-Day Matrix)
+    const gridContainer = document.getElementById('calendarGridDays');
+    if (!gridContainer) return;
+
+    gridContainer.innerHTML = '';
+
+    const firstDayIndex = new Date(state.calendarYear, state.calendarMonth, 1).getDay(); // 0 = Sun
+    const daysInMonth = new Date(state.calendarYear, state.calendarMonth + 1, 0).getDate();
+    const daysInPrevMonth = new Date(state.calendarYear, state.calendarMonth, 0).getDate();
+    const totalCells = Math.ceil((firstDayIndex + daysInMonth) / 7) * 7;
+
+    for (let i = 0; i < totalCells; i++) {
+      let cellDateIso = '';
+      let displayDay = 0;
+      let isOtherMonth = false;
+
+      if (i < firstDayIndex) {
+        displayDay = daysInPrevMonth - firstDayIndex + i + 1;
+        const prevM = state.calendarMonth === 0 ? 11 : state.calendarMonth - 1;
+        const prevY = state.calendarMonth === 0 ? state.calendarYear - 1 : state.calendarYear;
+        cellDateIso = `${prevY}-${String(prevM + 1).padStart(2, '0')}-${String(displayDay).padStart(2, '0')}`;
+        isOtherMonth = true;
+      } else if (i >= firstDayIndex + daysInMonth) {
+        displayDay = i - (firstDayIndex + daysInMonth) + 1;
+        const nextM = state.calendarMonth === 11 ? 0 : state.calendarMonth + 1;
+        const nextY = state.calendarMonth === 11 ? state.calendarYear + 1 : state.calendarYear;
+        cellDateIso = `${nextY}-${String(nextM + 1).padStart(2, '0')}-${String(displayDay).padStart(2, '0')}`;
+        isOtherMonth = true;
+      } else {
+        displayDay = i - firstDayIndex + 1;
+        cellDateIso = `${state.calendarYear}-${String(state.calendarMonth + 1).padStart(2, '0')}-${String(displayDay).padStart(2, '0')}`;
+        isOtherMonth = false;
+      }
+
+      // Query published, manager-approved shifts on this day
+      const dayShifts = state.shifts.filter(s => s.dateIso === cellDateIso);
+      const isToday = cellDateIso === todayIso;
+      const isSelected = cellDateIso === state.calendarSelectedDate;
+
+      // Color-coding rules:
+      // Blue: Current logged-in user has an assigned approved shift
+      // Orange: Contains open / unassigned or up-for-grabs shifts
+      // Split (Blue + Orange): Has both my shift AND open shift
+      const hasMyShift = dayShifts.some(s => s.userId === user.id);
+      const hasOpenShift = dayShifts.some(s => !s.userId || s.status === 'Open' || s.status === 'Up for Grabs');
+      const isSplit = hasMyShift && hasOpenShift;
+
+      const cell = document.createElement('div');
+      let classes = ['cal-day-cell'];
+      if (isOtherMonth) classes.push('cal-day-other-month');
+      if (isSplit) classes.push('cal-day-split');
+      else if (hasMyShift) classes.push('cal-day-my-shift');
+      else if (hasOpenShift) classes.push('cal-day-open-shift');
+      if (isToday) classes.push('cal-day-today');
+      if (isSelected) classes.push('cal-day-selected');
+
+      cell.className = classes.join(' ');
+      cell.setAttribute('data-action', 'select-cal-day');
+      cell.setAttribute('data-date', cellDateIso);
+      cell.setAttribute('role', 'gridcell');
+      cell.setAttribute('tabindex', '0');
+      cell.setAttribute('aria-label', `${formatLongDateDisplay(cellDateIso)}: ${dayShifts.length} shifts`);
+
+      let pillHtml = '';
+      if (hasMyShift) {
+        pillHtml += `
+          <span class="cal-pill pill-my-shift" title="You are assigned to work on this date">
+            <span class="cal-pill-dot"></span>My Shift
+          </span>
+        `;
+      }
+      if (hasOpenShift) {
+        const openCount = dayShifts.filter(s => !s.userId || s.status === 'Open' || s.status === 'Up for Grabs').length;
+        pillHtml += `
+          <span class="cal-pill pill-open-shift" title="${openCount} open / up-for-grabs shift(s)">
+            <span class="cal-pill-dot"></span>${openCount > 1 ? `${openCount} Open` : 'Open Shift'}
+          </span>
+        `;
+      }
+
+      cell.innerHTML = `
+        <div class="cal-day-header">
+          <span class="cal-day-number">${displayDay}</span>
+          ${dayShifts.length > 0 ? `<span class="cal-day-shift-count" title="${dayShifts.length} published shifts">${dayShifts.length}</span>` : ''}
+        </div>
+        <div class="cal-day-pills">
+          ${pillHtml}
+        </div>
+      `;
+
+      gridContainer.appendChild(cell);
+    }
+
+    // 4. Render Day Detail Drawer
+    renderCalendarDayDrawer();
+  }
+
+  function renderCalendarDayDrawer() {
+    const isMgr = isManagerUser();
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const dateIso = state.calendarSelectedDate || formatDateIso(new Date());
+    const dayShifts = state.shifts.filter(s => s.dateIso === dateIso);
+    const todayIso = formatDateIso(new Date());
+    const isPast = dateIso < todayIso;
+    const isToday = dateIso === todayIso;
+
+    const dateTitleEl = document.getElementById('dayDrawerDate');
+    const kickerEl = document.getElementById('dayDrawerKicker');
+    const actionsEl = document.getElementById('dayDrawerActions');
+    const summaryEl = document.getElementById('dayDrawerSummary');
+    const shiftsContainer = document.getElementById('dayDrawerShifts');
+
+    if (dateTitleEl) {
+      dateTitleEl.textContent = formatLongDateDisplay(dateIso);
+    }
+
+    if (kickerEl) {
+      if (isToday) kickerEl.textContent = 'TODAY • SELECTED DAY';
+      else if (isPast) kickerEl.textContent = 'PAST SCHEDULE RECORD • READ-ONLY';
+      else kickerEl.textContent = 'UPCOMING SCHEDULE • SELECTED DAY';
+    }
+
+    // Manager Action: "+ Add Shift" on this day
+    if (actionsEl) {
+      if (isMgr) {
+        actionsEl.innerHTML = `
+          <button type="button" class="btn-drawer-add" data-action="calendar-add-shift" data-date="${dateIso}" title="Add a new shift scheduled on ${dateIso}">
+            + Add Shift
+          </button>
+        `;
+      } else {
+        actionsEl.innerHTML = '';
+      }
+    }
+
+    // Day Summary Badges
+    if (summaryEl) {
+      const myShiftsCount = dayShifts.filter(s => s.userId === user.id).length;
+      const openShiftsCount = dayShifts.filter(s => !s.userId || s.status === 'Open' || s.status === 'Up for Grabs').length;
+
+      let summaryHtml = `
+        <span class="drawer-badge badge-neutral">
+          📅 ${dayShifts.length} Shift${dayShifts.length === 1 ? '' : 's'}
+        </span>
+      `;
+
+      if (myShiftsCount > 0) {
+        const myHours = dayShifts.filter(s => s.userId === user.id).reduce((sum, s) => sum + s.hours, 0);
+        summaryHtml += `
+          <span class="drawer-badge badge-working">
+            👤 Assigned to You (${myHours.toFixed(1)}h)
+          </span>
+        `;
+      }
+
+      if (openShiftsCount > 0) {
+        summaryHtml += `
+          <span class="drawer-badge badge-open">
+            🟠 ${openShiftsCount} Open / Up for Grabs
+          </span>
+        `;
+      }
+
+      if (isPast) {
+        summaryHtml += `
+          <span class="drawer-badge badge-past">
+            📜 Historical Record
+          </span>
+        `;
+      }
+
+      summaryEl.innerHTML = summaryHtml;
+    }
+
+    // Shifts List
+    if (!shiftsContainer) return;
+    shiftsContainer.innerHTML = '';
+
+    if (dayShifts.length === 0) {
+      shiftsContainer.innerHTML = `
+        <div class="drawer-empty-state">
+          <div class="drawer-empty-icon">📅</div>
+          <div class="drawer-empty-title">No shifts scheduled for this date</div>
+          <div class="drawer-empty-desc">
+            ${isMgr 
+              ? 'Click <strong>"+ Add Shift"</strong> above to schedule coverage for this date.' 
+              : 'No shifts scheduled or coverage needed for this date.'}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    dayShifts.forEach(shift => {
+      const assignedUser = getUserById(shift.userId);
+      const isMine = assignedUser && assignedUser.id === user.id;
+      const isCertified = (user.certifications || []).includes(shift.role);
+      const isSelected = state.selectedShiftId === shift.id;
+      const isPendingMyReview = state.approvals.some(a => a.shiftId === shift.id && a.userId === user.id);
+      const ot = assignedUser ? checkEmployeeOvertime(assignedUser.id, shift.dateIso, 0) : null;
+
+      const otBadgeHtml = (ot && ot.isOvertime)
+        ? `<span class="status-pill ot-risk" style="font-size:0.68rem;" title="${ot.user.name} scheduled for ${ot.currentWeeklyHours}h (${ot.typeLabel} limit: ${ot.threshold}h)">⚠️ ${ot.badgeText}</span>`
+        : '';
+
+      let statusBadgeHtml = '';
+      if (shift.isSwapped) {
+        statusBadgeHtml = `
+          <span class="status-pill swapped" title="${shift.swappedFrom ? `Covered from ${shift.swappedFrom}` : 'Approved swap'}">
+            🔄 Covered / Swapped
+          </span>
+        `;
+      } else if (shift.status === 'Up for Grabs') {
+        statusBadgeHtml = `<span class="status-pill up-for-grabs">Up for Grabs</span>`;
+      } else if (shift.status === 'Open' || !shift.userId) {
+        statusBadgeHtml = `<span class="status-pill open">Open</span>`;
+      } else {
+        statusBadgeHtml = `<span class="status-pill covered">Covered</span>`;
+      }
+
+      let actionButtons = '';
+
+      if (isMgr) {
+        // Manager Actions (Edit / Delete / Validate)
+        actionButtons = `
+          <div class="drawer-shift-actions">
+            <button class="btn-shift-action validate" data-action="validate-shift" data-shift-id="${shift.id}" title="Evaluate replacement coverage for this shift">
+              ${isSelected ? '✓ Validating' : 'Validate'}
+            </button>
+            <button class="btn-shift-action" data-action="edit-shift" data-shift-id="${shift.id}" title="Edit shift details">
+              ✏️ Edit
+            </button>
+            <button class="btn-shift-action danger" data-action="delete-shift" data-shift-id="${shift.id}" title="Delete shift from schedule">
+              🗑️
+            </button>
+          </div>
+        `;
+      } else {
+        // Employee Actions
+        if (isPast) {
+          actionButtons = `<span class="drawer-badge badge-past">Past Shift</span>`;
+        } else if (isPendingMyReview) {
+          actionButtons = `<span style="font-size:0.75rem; color:#B45309; font-weight:700;">Claim Pending</span>`;
+        } else if (shift.status === 'Open' || shift.status === 'Up for Grabs') {
+          if (!isMine) {
+            if (isCertified) {
+              actionButtons = `<button class="btn-action-claim" data-action="claim-shift" data-shift-id="${shift.id}">Claim</button>`;
+            } else {
+              actionButtons = `<span style="font-size:0.75rem; color:#9CA3AF;">Not Certified</span>`;
+            }
+          } else {
+            actionButtons = `
+              <div class="drawer-shift-actions">
+                <button class="btn-action-withdraw" data-action="withdraw-coverage" data-shift-id="${shift.id}">Withdraw</button>
+                <button class="btn-action-swap" data-action="open-propose-swap" data-shift-id="${shift.id}">Propose swap</button>
+              </div>
+            `;
+          }
+        } else if (isMine) {
+          actionButtons = `
+            <button class="btn-action-swap" data-action="offer-coverage" data-shift-id="${shift.id}">
+              Offer coverage
+            </button>
+          `;
+        } else {
+          actionButtons = `<span style="color:#9CA3AF; font-size:0.78rem;">Covered</span>`;
+        }
+      }
+
+      const card = document.createElement('div');
+      card.className = `drawer-shift-card ${isMine ? 'card-my-shift' : ''} ${(!shift.userId || shift.status === 'Open' || shift.status === 'Up for Grabs') ? 'card-open-shift' : ''}`;
+
+      card.innerHTML = `
+        <div class="drawer-shift-top">
+          <div>
+            <div class="drawer-shift-role">${shift.role}</div>
+            <div class="drawer-shift-service">${shift.serviceName} &bull; ${shift.notes || 'Station'}</div>
+          </div>
+          <div class="drawer-shift-time">
+            <span>⏰ ${shift.startTime} &ndash; ${shift.endTime}</span>
+            <span class="drawer-shift-hours">${shift.hours.toFixed(1)} hrs</span>
+          </div>
+        </div>
+
+        <div class="drawer-shift-assignee">
+          ${assignedUser ? `
+            <span class="user-circle ${(assignedUser.initials || 'mc').toLowerCase()}" style="width:26px;height:26px;font-size:0.68rem;">${assignedUser.initials}</span>
+            <div>
+              <span style="font-weight:700; ${isMine ? 'color:#059669;' : 'color:var(--text-dark);'}">
+                ${assignedUser.name}${isMine ? ' (You)' : ''}
+              </span>
+              <span class="employment-badge ${assignedUser.employmentType === 'part-time' ? 'pt' : 'ft'}" style="margin-left:0.35rem; font-size:0.68rem;">
+                ${assignedUser.employmentType === 'part-time' ? 'PT 32h' : 'FT 40h'}
+              </span>
+            </div>
+          ` : '<span style="color:#D97706; font-weight:700; font-size:0.8rem;">🟠 Open (Unassigned)</span>'}
+        </div>
+
+        <div class="drawer-shift-status-row">
+          <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+            ${statusBadgeHtml}
+            ${otBadgeHtml}
+          </div>
+          <div>
+            ${actionButtons}
+          </div>
+        </div>
+      `;
+
+      shiftsContainer.appendChild(card);
+    });
+  }
+
+  function handleCalendarPrevMonth() {
+    const now = new Date();
+    const minRetentionDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+    const targetDate = new Date(state.calendarYear, state.calendarMonth - 1, 1);
+
+    if (targetDate < minRetentionDate) {
+      showToast('12-Month historical schedule retention window limit reached.', 'warning');
+      return;
+    }
+
+    if (state.calendarMonth === 0) {
+      state.calendarYear--;
+      state.calendarMonth = 11;
+    } else {
+      state.calendarMonth--;
+    }
+    state.calendarSelectedDate = `${state.calendarYear}-${String(state.calendarMonth + 1).padStart(2, '0')}-01`;
+    renderCalendarView();
+  }
+
+  function handleCalendarNextMonth() {
+    if (state.calendarMonth === 11) {
+      state.calendarYear++;
+      state.calendarMonth = 0;
+    } else {
+      state.calendarMonth++;
+    }
+    state.calendarSelectedDate = `${state.calendarYear}-${String(state.calendarMonth + 1).padStart(2, '0')}-01`;
+    renderCalendarView();
+  }
+
+  function handleCalendarToday() {
+    const now = new Date();
+    state.calendarYear = now.getFullYear();
+    state.calendarMonth = now.getMonth();
+    state.calendarSelectedDate = formatDateIso(now);
+    renderCalendarView();
   }
 
   // =========================================================================
@@ -3171,6 +3781,24 @@
       document.getElementById('sidebar')?.classList.toggle('open');
     });
 
+    // Schedule View Mode Toggle: List View vs Calendar View
+    document.getElementById('btnViewModeList')?.addEventListener('click', () => {
+      state.scheduleDisplayMode = 'list';
+      saveState();
+      renderShiftBoardView();
+    });
+
+    document.getElementById('btnViewModeCalendar')?.addEventListener('click', () => {
+      state.scheduleDisplayMode = 'calendar';
+      saveState();
+      renderShiftBoardView();
+    });
+
+    // Calendar Navigation Controls
+    document.getElementById('btnCalPrevMonth')?.addEventListener('click', handleCalendarPrevMonth);
+    document.getElementById('btnCalNextMonth')?.addEventListener('click', handleCalendarNextMonth);
+    document.getElementById('btnCalToday')?.addEventListener('click', handleCalendarToday);
+
     // Schedule Period Toggle: Bi-Weekly vs Monthly
     document.getElementById('btnToggleBiweekly')?.addEventListener('click', () => {
       state.scheduleViewPeriod = 'biweekly';
@@ -3444,12 +4072,39 @@
         return;
       }
 
+      // Calendar day selection
+      const calDayBtn = e.target.closest('[data-action="select-cal-day"]');
+      if (calDayBtn) {
+        const dateIso = calDayBtn.getAttribute('data-date');
+        if (dateIso) {
+          const [y, m] = dateIso.split('-').map(Number);
+          state.calendarYear = y;
+          state.calendarMonth = m - 1;
+          state.calendarSelectedDate = dateIso;
+          renderCalendarView();
+        }
+        return;
+      }
+
+      // Manager Add shift on specific calendar day
+      const calAddShiftBtn = e.target.closest('[data-action="calendar-add-shift"]');
+      if (calAddShiftBtn) {
+        if (!isManagerUser()) return;
+        const dateIso = calAddShiftBtn.getAttribute('data-date') || state.calendarSelectedDate;
+        openShiftEditModal(null, dateIso);
+        return;
+      }
+
       // Manager Validate shift
       const valBtn = e.target.closest('[data-action="validate-shift"]');
       if (valBtn) {
         if (!isManagerUser()) return;
         const shiftId = valBtn.getAttribute('data-shift-id');
         state.selectedShiftId = state.selectedShiftId === shiftId ? null : shiftId;
+        if (state.scheduleDisplayMode === 'calendar') {
+          state.scheduleDisplayMode = 'list';
+          showToast('Switched to List View to show Deterministic Validation Engine.', 'info');
+        }
         renderShiftBoardView();
         return;
       }

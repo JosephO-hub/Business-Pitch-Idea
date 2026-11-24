@@ -266,14 +266,31 @@
         <section class="view-panel" id="view-shifts">
           <div class="panel-section-header">
             <div>
-              <h1 class="view-heading" style="font-size: 2rem;">Master Schedule &amp; Coverage</h1>
+              <h1 class="view-heading" id="shiftBoardMainTitle" style="font-size: 2rem;">Master Schedule &amp; Coverage</h1>
               <p class="view-subheading" id="shiftBoardSubtitle">Unified bi-weekly or monthly restaurant schedule with live shift coverage &amp; swap synchronization.</p>
             </div>
             <div id="shiftBoardHeaderRight"></div>
           </div>
 
+          <!-- Schedule View Mode Toggle ("List View" | "Calendar View") -->
+          <div class="schedule-view-mode-bar">
+            <div class="schedule-view-mode-toggle" role="group" aria-label="Schedule View Mode">
+              <button type="button" class="btn-view-mode active" data-view-mode="list" id="btnViewModeList">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <span>List View</span>
+              </button>
+              <button type="button" class="btn-view-mode" data-view-mode="calendar" id="btnViewModeCalendar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>Calendar View</span>
+              </button>
+            </div>
+            <div class="view-mode-meta" id="viewModeMetaText">
+              <span>Synchronized with published schedule records in local storage.</span>
+            </div>
+          </div>
+
           <!-- Schedule Header Controls (Period Switcher, Date Range, Manager Actions) -->
-          <div class="schedule-header-controls">
+          <div class="schedule-header-controls" id="scheduleListHeaderControls">
             <div class="schedule-header-left">
               <div class="schedule-period-toggle" role="group" aria-label="Schedule Period">
                 <button type="button" class="btn-period-toggle active" data-period="biweekly" id="btnToggleBiweekly">
@@ -361,6 +378,99 @@
             <div class="candidates-grid" id="swapCandidatesGrid">
               <div class="empty-state">
                 <p>Click <strong>"Validate Coverage"</strong> on any scheduled employee above to evaluate eligible replacement staff.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========================================================== -->
+          <!-- MONTHLY CALENDAR VIEW CARD (ROLE-ADAPTIVE & APPROVAL-SYNC) -->
+          <!-- ========================================================== -->
+          <div class="content-card calendar-card" id="calendarViewCard" style="display: none;">
+            
+            <!-- Calendar Navigation, Quick Jump & Legend Bar -->
+            <div class="calendar-topbar">
+              <div class="calendar-topbar-left">
+                <div class="calendar-nav-group">
+                  <button type="button" class="btn-cal-nav" id="btnCalPrevMonth" title="Navigate to previous month (up to 12 months rolling history)" aria-label="Previous Month">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    <span>Prev</span>
+                  </button>
+                  <h2 class="calendar-month-title" id="calendarMonthTitle">November 2026</h2>
+                  <button type="button" class="btn-cal-nav" id="btnCalNextMonth" title="Navigate to next month" aria-label="Next Month">
+                    <span>Next</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </button>
+                  <button type="button" class="btn-cal-today" id="btnCalToday" title="Jump to current date">
+                    Today
+                  </button>
+                </div>
+                <span class="calendar-month-badge" id="calendarMonthStats">0 Published Shifts</span>
+              </div>
+
+              <!-- Color-Coded Highlight Legend -->
+              <div class="calendar-legend" role="region" aria-label="Calendar highlight legend">
+                <div class="legend-item" title="Days where you have an assigned, manager-approved shift">
+                  <span class="legend-swatch swatch-blue"></span>
+                  <span class="legend-label" id="legendLabelMyShift">My Shift</span>
+                </div>
+                <div class="legend-item" title="Days with unassigned open shifts or shifts up for grabs">
+                  <span class="legend-swatch swatch-orange"></span>
+                  <span class="legend-label">Open / Up for Grabs</span>
+                </div>
+                <div class="legend-item" title="Days with both your assigned shift AND open/grabs shifts">
+                  <span class="legend-swatch swatch-split"></span>
+                  <span class="legend-label">My Shift + Open</span>
+                </div>
+                <div class="legend-item" title="Current calendar day">
+                  <span class="legend-swatch swatch-today"></span>
+                  <span class="legend-label">Today</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Calendar Main Workspace: 7-Day Monthly Grid + Day Detail Drawer -->
+            <div class="calendar-workspace-layout">
+              <!-- Left / Primary: Responsive 7-Day Monthly Calendar Grid -->
+              <div class="calendar-grid-pane">
+                <div class="calendar-weekdays-row" aria-hidden="true">
+                  <div class="cal-weekday-col weekend">Sun</div>
+                  <div class="cal-weekday-col">Mon</div>
+                  <div class="cal-weekday-col">Tue</div>
+                  <div class="cal-weekday-col">Wed</div>
+                  <div class="cal-weekday-col">Thu</div>
+                  <div class="cal-weekday-col">Fri</div>
+                  <div class="cal-weekday-col weekend">Sat</div>
+                </div>
+
+                <div class="calendar-grid-cells" id="calendarGridDays" role="grid" aria-label="Monthly shift calendar">
+                  <!-- Populated dynamically via JS -->
+                </div>
+
+                <div class="calendar-retention-footer">
+                  <span class="retention-dot"></span>
+                  <span id="calendarRetentionNotice">12-Month Rolling Schedule Retention active: shifts prior to 12 months ago are pruned on device.</span>
+                </div>
+              </div>
+
+              <!-- Right: Interactive Day Detail Drawer / Panel -->
+              <div class="calendar-day-drawer" id="calendarDayDrawer" role="region" aria-label="Selected day details">
+                <div class="day-drawer-header">
+                  <div class="day-drawer-header-text">
+                    <span class="day-drawer-kicker" id="dayDrawerKicker">SELECTED DAY</span>
+                    <h3 class="day-drawer-title" id="dayDrawerDate">Select a day</h3>
+                  </div>
+                  <div class="day-drawer-header-actions" id="dayDrawerActions">
+                    <!-- Populated dynamically (e.g. "+ Add Shift" for Manager) -->
+                  </div>
+                </div>
+
+                <div class="day-drawer-summary" id="dayDrawerSummary">
+                  <!-- Badges for the day (shift count, user coverage, open status) -->
+                </div>
+
+                <div class="day-drawer-shifts-list" id="dayDrawerShifts">
+                  <!-- Individual shift cards populated dynamically via JS -->
+                </div>
               </div>
             </div>
           </div>
